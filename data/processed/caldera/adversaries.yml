@@ -1,0 +1,42 @@
+- adversary_id: kisa-ttp-adversary
+  name: KISA TTP Adversary
+  description: Auto-generated adversary profile from KISA TTP report
+  atomic_ordering:
+  - bce5dfd5-f459-5b57-bf7a-0f5737f7daf4
+  - efbf0adc-d132-54ee-a10f-e6a46ee78402
+  - 0c23583b-6b68-526c-a44e-f3ea67e4851c
+  - e6c1137b-e69d-5cd4-9800-c3696082a127
+  - 9f6a427a-6f30-591e-a254-8c1c1fabde62
+  - 59a0db18-03c2-54e9-a05e-69904c66877d
+  - acf1ba80-78c9-5100-99e4-ca1fbc70210d
+  - 881817d9-1151-5a2e-84f7-1187795182b1
+  - 70f7612f-f32b-54a2-84e9-a8f1886c2adf
+  - afe20298-4596-5ee2-9ad3-51fcdf7abd9e
+  - 6be6e030-8fa1-5885-8ef6-86f04ba4da91
+  - c439183c-0e51-5f68-8851-cb66b70af735
+  - b1e7bf60-5129-5c23-97a2-5c492bf9d654
+  - 80531fa0-0a21-5e3c-8cc3-dc56e6af357b
+  - 759e07eb-66a5-5e84-a1a4-a1111e89690e
+  - 724c5125-bd13-58da-a644-ef3033d677c6
+  - 5cce4287-674a-55fd-aa7c-d0b2d849ba32
+  - d6ce6ba6-e253-5b24-9ec7-9e8fb31b5009
+  - a5f0aa81-814a-5d8c-bf6e-d3b2aa9c6199
+  - cec09d07-f7d5-589f-9a09-3b669c7cbde3
+  - f0e60b6b-170b-5bd3-9ecd-6d560fc7d253
+  - efef5fa5-119c-58f4-87c9-e07d518720df
+  - 14d99b4b-79b6-500e-9fa7-cf0a217834b6
+  - 046c5a48-bf18-5623-8355-ebccd3817420
+  - 5675be5d-79a6-513c-902d-465697ab6e82
+  - bcae3bc5-ef96-529b-8adc-23e7dd470409
+  - f2bdd9a5-8f91-5172-b592-92110a0d4c77
+  - a8ff640d-82e5-5716-b90c-0d6765e32071
+  - 34aecd20-a9cf-54ac-8975-578c755fe1c6
+  - 66d54434-4377-5453-bee1-3721447ef82e
+  - a304bb3c-c126-5e59-81c5-a72b67697f30
+  - aaf54596-73bb-5caf-a3ae-aaa9864947f0
+  - ae602ea6-28fb-5d5b-a32b-0d89953bb32b
+  - 4d06e25a-2ad0-5ee1-91d8-155c7f80808c
+  - c223a2b7-0c71-5ff5-b571-2410916ed280
+  - 4da6623d-f8ed-584e-9d67-871ed5de2d45
+  - 9ffc1020-1fda-5368-a3be-387e8ad69acf
+  - a864b78e-6d82-52cb-af27-1f444f22fa03

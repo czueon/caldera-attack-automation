@@ -18,8 +18,7 @@ from modules.module1_abstract_flow import AbstractFlowExtractor
 from modules.module2_concrete_flow import ConcreteFlowGenerator
 from modules.module3_technique_selection import TechniqueSelector
 from modules.module4_ability_generator import AbilityGenerator
-from modules.module4_5_ability_splitter import AbilitySplitter
-from modules.module5_visualization import KillChainVisualizer
+from modules.module5_visualization import AbilityFlowVisualizer
 
 
 def parse_step_range(step_arg):
@@ -30,10 +29,10 @@ def parse_step_range(step_arg):
         "0"     → [0]
         "0~3"   → [0, 1, 2, 3]
         "2~5"   → [2, 3, 4, 5]
-        "all"   → [0, 1, 2, 3, 4, 5, 5.5, 6]
+        "all"   → [0, 1, 2, 3, 4, 5]
     """
     if step_arg == "all":
-        return [0, 1, 2, 3, 4, 4.5, 5]
+        return [0, 1, 2, 3, 4, 5]
 
     if "~" in step_arg:
         # 범위 지정
@@ -44,18 +43,13 @@ def parse_step_range(step_arg):
         if start > end:
             raise ValueError(f"Invalid range: {start}~{end} (start > end)")
 
-        # 4.5를 포함하는 범위 처리
-        steps = []
-        for i in range(start, end + 1):
-            steps.append(i)
-            if i == 4 and end >= 5:
-                steps.append(4.5)
-
+        # 범위 생성
+        steps = list(range(start, end + 1))
         return steps
     else:
         # 단일 step
         try:
-            return [float(step_arg)]
+            return [int(step_arg)]
         except ValueError:
             raise ValueError(f"Invalid step: {step_arg}")
 
@@ -77,13 +71,12 @@ def main():
   2      : 구체적 공격 흐름 생성 (환경 적용, Technique 후보)
   3      : Technique 최종 선택 (Top 3 → Final 1)
   4      : Caldera Ability 생성
-  4.5    : Ability 파일 분할
   5      : Kill Chain 시각화
   all    : 전체 실행
 
   범위 지정:
   0~2    : Step 0, 1, 2 실행
-  2~5    : Step 2, 3, 4, 4.5, 5 실행
+  2~5    : Step 2, 3, 4, 5 실행
 """
     )
 
@@ -105,12 +98,6 @@ def main():
         type=str,
         default="data/processed",
         help="중간 결과 저장 디렉토리 (기본: data/processed)"
-    )
-
-    parser.add_argument(
-        "--regenerate-ids",
-        action="store_true",
-        help="Step 4.5에서 ability UUID 재생성"
     )
 
     args = parser.parse_args()
@@ -226,21 +213,6 @@ def main():
         generator = AbilityGenerator()
         generator.generate_abilities(input_file, caldera_output_dir)
 
-    # Step 4.5: Ability Splitting
-    if 4.5 in steps:
-        print("\n[Step 4.5] Ability File Splitting")
-        print("-" * 70)
-
-        abilities_file = f"{timestamped_output_dir}/caldera_abilities/abilities.yml"
-        split_output_dir = f"{timestamped_output_dir}/caldera_abilities/individual_abilities"
-
-        if not Path(abilities_file).exists():
-            print(f"[ERROR] {abilities_file} 파일이 없습니다. Step 4를 먼저 실행하세요.")
-            sys.exit(1)
-
-        splitter = AbilitySplitter()
-        splitter.split_abilities(abilities_file, split_output_dir, regenerate_ids=args.regenerate_ids)
-
     # Step 5: Kill Chain Visualization
     if 5 in steps:
         print("\n[Step 5] Kill Chain Visualization")
@@ -260,8 +232,8 @@ def main():
 
         visualization_dir = f"{timestamped_output_dir}/visualizations"
 
-        visualizer = KillChainVisualizer()
-        visualizer.visualize_killchains(input_file, visualization_dir)
+        visualizer = AbilityFlowVisualizer()
+        visualizer.visualize_abilities(input_file, visualization_dir)
 
     print("\n" + "="*70)
     print("[SUCCESS] 완료!")

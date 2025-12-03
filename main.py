@@ -10,6 +10,7 @@ import os
 import argparse
 import sys
 from pathlib import Path
+from datetime import datetime
 
 # 모듈 임포트
 from modules.module0_pdf_processing import PDFProcessor
@@ -128,8 +129,15 @@ def main():
     print(f"실행 Step: {', '.join(map(str, steps))}")
     print("="*70)
 
+    # 현재 시간 기반 타임스탬프 폴더 생성
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    timestamped_output_dir = os.path.join(args.output_dir, timestamp)
+
     # 출력 디렉토리 생성
-    Path(args.output_dir).mkdir(parents=True, exist_ok=True)
+    Path(timestamped_output_dir).mkdir(parents=True, exist_ok=True)
+
+    print(f"결과 저장 위치: {timestamped_output_dir}")
+    print("="*70)
 
     # Step 0: PDF Processing
     if 0 in steps:
@@ -140,7 +148,7 @@ def main():
         print("\n[Step 0] PDF Processing")
         print("-" * 70)
 
-        step0_output = f"{args.output_dir}/step0_parsed.yml"
+        step0_output = f"{timestamped_output_dir}/step0_parsed.yml"
         processor = PDFProcessor()
         processor.process_pdf(args.pdf, step0_output)
 
@@ -149,8 +157,8 @@ def main():
         print("\n[Step 1] Abstract Attack Flow Extraction")
         print("-" * 70)
 
-        step0_output = f"{args.output_dir}/step0_parsed.yml"
-        step1_output = f"{args.output_dir}/step1_abstract_flow.yml"
+        step0_output = f"{timestamped_output_dir}/step0_parsed.yml"
+        step1_output = f"{timestamped_output_dir}/step1_abstract_flow.yml"
 
         if not Path(step0_output).exists():
             print(f"[ERROR] {step0_output} 파일이 없습니다. Step 0을 먼저 실행하세요.")
@@ -169,8 +177,8 @@ def main():
         print("\n[Step 2] Concrete Attack Flow Generation")
         print("-" * 70)
 
-        step1_output = f"{args.output_dir}/step1_abstract_flow.yml"
-        step2_output = f"{args.output_dir}/step2_concrete_flow.yml"
+        step1_output = f"{timestamped_output_dir}/step1_abstract_flow.yml"
+        step2_output = f"{timestamped_output_dir}/step2_concrete_flow.yml"
 
         if not Path(step1_output).exists():
             print(f"[ERROR] {step1_output} 파일이 없습니다. Step 1을 먼저 실행하세요.")
@@ -188,8 +196,8 @@ def main():
         print("\n[Step 3] Technique Selection")
         print("-" * 70)
 
-        step2_output = f"{args.output_dir}/step2_concrete_flow.yml"
-        step3_output = f"{args.output_dir}/step3_technique_selected.yml"
+        step2_output = f"{timestamped_output_dir}/step2_concrete_flow.yml"
+        step3_output = f"{timestamped_output_dir}/step3_technique_selected.yml"
 
         if not Path(step2_output).exists():
             print(f"[ERROR] {step2_output} 파일이 없습니다. Step 2를 먼저 실행하세요.")
@@ -203,8 +211,8 @@ def main():
         print("\n[Step 4] Caldera Ability Generation")
         print("-" * 70)
 
-        step3_output = f"{args.output_dir}/step3_technique_selected.yml"
-        step2_output = f"{args.output_dir}/step2_concrete_flow.yml"
+        step3_output = f"{timestamped_output_dir}/step3_technique_selected.yml"
+        step2_output = f"{timestamped_output_dir}/step2_concrete_flow.yml"
 
         # Step 3가 없으면 Step 2 사용
         input_file = step3_output if Path(step3_output).exists() else step2_output
@@ -213,7 +221,7 @@ def main():
             print(f"[ERROR] {input_file} 파일이 없습니다.")
             sys.exit(1)
 
-        caldera_output_dir = f"{args.output_dir}/caldera"
+        caldera_output_dir = f"{timestamped_output_dir}/caldera"
 
         generator = AbilityGenerator()
         generator.generate_abilities(input_file, caldera_output_dir)
@@ -223,8 +231,8 @@ def main():
         print("\n[Step 4.5] Ability File Splitting")
         print("-" * 70)
 
-        abilities_file = f"{args.output_dir}/caldera_abilities/abilities.yml"
-        split_output_dir = f"{args.output_dir}/caldera_abilities/individual_abilities"
+        abilities_file = f"{timestamped_output_dir}/caldera_abilities/abilities.yml"
+        split_output_dir = f"{timestamped_output_dir}/caldera_abilities/individual_abilities"
 
         if not Path(abilities_file).exists():
             print(f"[ERROR] {abilities_file} 파일이 없습니다. Step 4를 먼저 실행하세요.")
@@ -239,8 +247,8 @@ def main():
         print("-" * 70)
 
         # 가장 최신 Kill Chain 파일 사용
-        step3_output = f"{args.output_dir}/step3_technique_selected.yml"
-        step2_output = f"{args.output_dir}/step2_concrete_flow.yml"
+        step3_output = f"{timestamped_output_dir}/step3_technique_selected.yml"
+        step2_output = f"{timestamped_output_dir}/step2_concrete_flow.yml"
 
         if Path(step3_output).exists():
             input_file = step3_output
@@ -250,7 +258,7 @@ def main():
             print("[ERROR] Kill Chain 파일이 없습니다. Step 2~3 중 하나를 먼저 실행하세요.")
             sys.exit(1)
 
-        visualization_dir = f"{args.output_dir}/visualizations"
+        visualization_dir = f"{timestamped_output_dir}/visualizations"
 
         visualizer = KillChainVisualizer()
         visualizer.visualize_killchains(input_file, visualization_dir)

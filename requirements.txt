@@ -1,5 +1,8 @@
 # KISA TTPs Pipeline Dependencies
 
+# Python Version
+python==3.10.11
+
 # PDF Processing
 pdfplumber==0.11.0
 PyMuPDF==1.24.0
@@ -20,4 +23,4 @@ python-dotenv==1.0.1
 requests==2.31.0
 
 # Visualization
-graphviz>=0.20.0  # Kill Chain 시각화
+graphviz>=0.20.0

@@ -139,15 +139,32 @@ class CalderaUploader:
 def main():
     """Upload abilities and adversaries to Caldera"""
     import sys
+    import os
+    import argparse
 
-    if len(sys.argv) < 3:
-        print("Usage: python upload_to_caldera.py <abilities.yml> <adversaries.yml>")
+    parser = argparse.ArgumentParser(description="Upload abilities and adversaries to Caldera")
+    parser.add_argument("--caldera-dir", type=str, help="Caldera output directory (e.g., data/processed/20251203_142900/caldera)")
+    parser.add_argument("--abilities", type=str, help="Path to abilities.yml file")
+    parser.add_argument("--adversaries", type=str, help="Path to adversaries.yml file")
+
+    args = parser.parse_args()
+
+    # caldera-dir이 주어진 경우 자동으로 파일 경로 생성
+    if args.caldera_dir:
+        caldera_dir = Path(args.caldera_dir)
+        abilities_file = str(caldera_dir / "abilities.yml")
+        adversaries_file = str(caldera_dir / "adversaries.yml")
+    elif args.abilities and args.adversaries:
+        abilities_file = args.abilities
+        adversaries_file = args.adversaries
+    else:
+        print("Usage:")
+        print("  Option 1: python upload_to_caldera.py --caldera-dir <caldera_directory>")
+        print("  Option 2: python upload_to_caldera.py --abilities <abilities.yml> --adversaries <adversaries.yml>")
         print("\nExample:")
-        print("  python upload_to_caldera.py data/processed/caldera/abilities.yml data/processed/caldera/adversaries.yml")
+        print("  python upload_to_caldera.py --caldera-dir data/processed/20251203_142900/caldera")
+        print("  python upload_to_caldera.py --abilities data/processed/20251203_142900/caldera/abilities.yml --adversaries data/processed/20251203_142900/caldera/adversaries.yml")
         sys.exit(1)
-
-    abilities_file = sys.argv[1]
-    adversaries_file = sys.argv[2]
 
     # 파일 존재 확인
     if not Path(abilities_file).exists():
@@ -167,9 +184,10 @@ def main():
     # Adversaries 업로드
     uploader.upload_adversaries(adversaries_file)
 
-    # 추적 파일 저장
-    tracking_file = "data/processed/caldera/uploaded_ids.yml"
-    uploader.save_tracking_file(tracking_file)
+    # 추적 파일은 같은 디렉토리에 저장
+    caldera_dir = Path(abilities_file).parent
+    tracking_file = caldera_dir / "uploaded_ids.yml"
+    uploader.save_tracking_file(str(tracking_file))
 
     print("\n" + "="*70)
     print("[SUCCESS] Upload completed successfully!")

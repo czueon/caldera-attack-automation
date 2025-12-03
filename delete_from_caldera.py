@@ -103,14 +103,27 @@ class CalderaDeleter:
 def main():
     """Delete abilities and adversaries from Caldera"""
     import sys
+    import argparse
 
-    if len(sys.argv) < 2:
-        print("Usage: python delete_from_caldera.py <uploaded_ids.yml>")
+    parser = argparse.ArgumentParser(description="Delete abilities and adversaries from Caldera")
+    parser.add_argument("--caldera-dir", type=str, help="Caldera output directory (e.g., data/processed/20251203_142900/caldera)")
+    parser.add_argument("--tracking-file", type=str, help="Path to uploaded_ids.yml file")
+
+    args = parser.parse_args()
+
+    # caldera-dir이 주어진 경우 자동으로 tracking 파일 경로 생성
+    if args.caldera_dir:
+        tracking_file = str(Path(args.caldera_dir) / "uploaded_ids.yml")
+    elif args.tracking_file:
+        tracking_file = args.tracking_file
+    else:
+        print("Usage:")
+        print("  Option 1: python delete_from_caldera.py --caldera-dir <caldera_directory>")
+        print("  Option 2: python delete_from_caldera.py --tracking-file <uploaded_ids.yml>")
         print("\nExample:")
-        print("  python delete_from_caldera.py data/processed/caldera/uploaded_ids.yml")
+        print("  python delete_from_caldera.py --caldera-dir data/processed/20251203_142900/caldera")
+        print("  python delete_from_caldera.py --tracking-file data/processed/20251203_142900/caldera/uploaded_ids.yml")
         sys.exit(1)
-
-    tracking_file = sys.argv[1]
 
     # 파일 존재 확인
     if not Path(tracking_file).exists():

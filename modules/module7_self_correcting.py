@@ -231,7 +231,46 @@ class AbilityFixer:
     def _extract_command(self, text: str) -> str:
         """LLM 응답에서 명령어 추출"""
         match = re.search(r'```(?:powershell)?\s*(.*?)\s*```', text, re.DOTALL)
-        return match.group(1).strip() if match else text.strip()
+        command = match.group(1).strip() if match else text.strip()
+
+        # Caldera는 줄바꿈을 공백으로 변환하므로, 줄바꿈을 세미콜론으로 변환
+        command = self._normalize_command(command)
+        return command
+
+    def _normalize_command(self, command: str) -> str:
+        """
+        멀티라인 명령어를 Caldera 호환 단일 라인으로 변환
+
+        Caldera는 명령어의 줄바꿈을 공백으로 변환하여 실행하므로,
+        PowerShell 구문 에러 방지를 위해 줄바꿈을 세미콜론으로 변환
+        """
+        lines = command.split('\n')
+        normalized_lines = []
+
+        for line in lines:
+            stripped = line.strip()
+            if not stripped:
+                continue
+
+            # 이미 세미콜론으로 끝나거나, 블록 시작/끝이면 그대로
+            if stripped.endswith((';', '{', '}')):
+                normalized_lines.append(stripped)
+            # 주석은 그대로 (하지만 단일 라인에서는 문제될 수 있음)
+            elif stripped.startswith('#'):
+                continue  # 주석 제거
+            else:
+                normalized_lines.append(stripped + ';')
+
+        # 마지막 불필요한 세미콜론 정리
+        result = ' '.join(normalized_lines)
+        # };} 같은 패턴 정리
+        result = re.sub(r';\s*}', ' }', result)
+        # 연속 세미콜론 정리
+        result = re.sub(r';+', ';', result)
+        # 마지막 세미콜론 제거
+        result = result.rstrip(';')
+
+        return result
 
 
 # ============================================================================
@@ -487,8 +526,8 @@ class OfflineCorrector:
                     "failure_type": r.failure_type.value,
                     "success": r.success,
                     "reason": r.reason,
-                    "original_command": r.original_command[:300],
-                    "fixed_command": r.fixed_command[:300] if r.fixed_command else ""
+                    "original_command": r.original_command,
+                    "fixed_command": r.fixed_command if r.fixed_command else ""
                 }
                 for r in results
             ],

@@ -57,3 +57,51 @@ def get_llm_provider() -> str:
         str: LLM provider name (default: claude)
     """
     return os.getenv("LLM_PROVIDER", "claude").lower()
+
+
+def get_openai_api_key() -> str:
+    """Get OpenAI API key from environment variable.
+
+    Returns:
+        str: OpenAI API key
+
+    Raises:
+        ValueError: If API key is not found
+    """
+    api_key = os.getenv('OPENAI_API_KEY')
+    if not api_key:
+        raise ValueError("OPENAI_API_KEY not found in environment variables")
+    return api_key
+
+
+def get_openai_model() -> str:
+    """Get OpenAI model name from environment variable.
+
+    Returns:
+        str: OpenAI model name (default: gpt-4o)
+    """
+    return os.getenv('OPENAI_MODEL', 'gpt-4o')
+
+
+def get_google_api_key() -> str:
+    """Get Google API key from environment variable.
+
+    Returns:
+        str: Google API key
+
+    Raises:
+        ValueError: If API key is not found
+    """
+    api_key = os.getenv('GOOGLE_API_KEY')
+    if not api_key:
+        raise ValueError("GOOGLE_API_KEY not found in environment variables")
+    return api_key
+
+
+def get_gemini_model() -> str:
+    """Get Gemini model name from environment variable.
+
+    Returns:
+        str: Gemini model name (default: gemini-2.0-flash-exp)
+    """
+    return os.getenv('GEMINI_MODEL', 'gemini-2.0-flash-exp')

@@ -138,17 +138,14 @@ class AbilityGenerator:
 
         print(f"  [생성 중] {node_id}. {node_name} ({technique_id})")
 
-        # 1. Extract command (generated in Step 3)
-        if 'commands' in environment_specific and environment_specific['commands']:
-            existing_commands = environment_specific['commands']
-            if isinstance(existing_commands, list):
-                command = '\n'.join(existing_commands)
-            else:
-                command = existing_commands
-        else:
-            print(f"  [WARNING] {node_name} No commands found - skipping")
-            self.failed_nodes.append({'id': node_id, 'name': node_name, 'reason': 'No commands found'})
+        # 1. Generate command using LLM (Step 4 responsibility)
+        command = self._generate_command_only(node)
+        if not command:
+            print(f"  [WARNING] {node_name} Command generation failed - skipping")
+            self.failed_nodes.append({'id': node_id, 'name': node_name, 'reason': 'Command generation failed'})
             return None
+
+        print(f"    [OK] Command: {command[:80]}..." if len(command) > 80 else f"    [OK] Command: {command}")
 
         # 2. 전처리: Payload 파일 추출
         payloads = self._extract_payloads_from_environment(environment_specific)
@@ -256,10 +253,19 @@ class AbilityGenerator:
 5. Keep commands simple - just use the file that's already there
 """
 
+        # Get tactic and technique info
+        tactic = node.get('tactic', 'execution')
+        technique = node.get('technique', {})
+        technique_id = technique.get('id', 'T0000')
+        technique_name = technique.get('name', 'Unknown')
+
         prompt = self.prompt_manager.render(
             "step4_generate_command.yaml",
             node_name=node_name,
             description=description,
+            tactic=tactic,
+            technique_id=technique_id,
+            technique_name=technique_name,
             env_text=env_text,
             payload_guide=payload_guide
         )

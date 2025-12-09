@@ -59,8 +59,7 @@ prompt: |
           username: "actual username"
           password: "actual password"
         payload: "actual filename"
-        commands: "PowerShell command in single line"  # IMPORTANT: Generate executable command here
-        # Include ANY other details mentioned
+        # Include ANY other details mentioned (paths, ports, services, vulnerabilities, etc.)
 
   edges:
     - from: "node_id"

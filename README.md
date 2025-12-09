@@ -1,26 +1,15 @@
-# KISA TTP → Caldera Adversary Automation Pipeline
+# KISA TTP to Caldera Adversary Automation
 
-KISA 위협 인텔리전스 보고서(PDF)를 자동으로 분석하여 MITRE Caldera 공격 시뮬레이션용 Adversary Profile을 생성하는 파이프라인
-
-## 개요
-
-이 프로젝트는 KISA의 TTP(Tactics, Techniques, and Procedures) 보고서를 입력으로 받아 다음을 자동 생성합니다:
-
-- **Abstract Attack Flow**: 환경 독립적인 추상 공격 흐름
-- **Concrete Attack Flow**: 환경별 구체화된 공격 시나리오
-- **MITRE ATT&CK Technique Mapping**: 각 단계에 대한 technique 자동 매핑
-- **Caldera Abilities**: 실행 가능한 PowerShell 명령어
-- **Caldera Adversary Profile**: 전체 공격 시나리오 통합 프로필
-- **시각화**: 실행 순서, 의존성, Kill Chain 그래프
+KISA 위협 인텔리전스 보고서(PDF)를 자동으로 분석하여 MITRE Caldera 공격 시뮬레이션용 Adversary Profile을 생성하고, 실행 결과를 기반으로 AI가 자동으로 수정하는 완전 자동화 파이프라인입니다.
 
 ## 주요 기능
 
-- ✅ **완전 자동화**: PDF → Caldera Adversary 전 과정 자동화
-- ✅ **AI 기반 분석**: Claude Sonnet 4.5를 사용한 지능형 TTP 추출
-- ✅ **MITRE ATT&CK 통합**: mitreattack-python 라이브러리 기반 technique 매핑
-- ✅ **환경 맞춤형**: 특정 환경 설정에 맞춘 구체적 명령어 생성
-- ✅ **Caldera 네이티브**: Caldera API 호환 YAML 형식 출력
-- ✅ **시각화 지원**: Graphviz 기반 3종 시각화 + ATT&CK Navigator 연동
+- **완전 자동화**: PDF 입력부터 Caldera 실행, 결과 분석까지 전 과정 자동화
+- **AI 기반 분석**: Claude Sonnet 4.5를 활용한 지능형 TTP 추출 및 명령어 생성
+- **MITRE ATT&CK 통합**: mitreattack-python 기반 자동 Technique 매핑
+- **환경 맞춤형**: 특정 환경 설정에 맞춘 구체적 PowerShell 명령어 생성
+- **Self-Correcting**: 실패한 Ability를 AI가 자동 분석 및 수정 후 재실행
+- **성공률 비교**: 초기 실행 대비 수정 후 성공률 개선 현황 자동 출력
 
 ## 시스템 아키텍처
 
@@ -31,260 +20,48 @@ KISA 위협 인텔리전스 보고서(PDF)를 자동으로 분석하여 MITRE Ca
            │
            ▼
 ┌─────────────────────┐
-│  Module 0           │  PDF → 텍스트 추출 (pypdf)
+│  Step 1             │  PDF 텍스트 추출
 │  PDF Processing     │
 └──────────┬──────────┘
            │
            ▼
 ┌─────────────────────┐
-│  Module 1           │  환경 독립적 추상 flow 추출
-│  Abstract Flow      │  - Attack goals
-│  Extraction         │  - MITRE tactics
+│  Step 2             │  환경 독립적 추상 공격 흐름 생성
+│  Abstract Flow      │  - Attack goals 추출
+│                     │  - MITRE tactics 매핑
 └──────────┬──────────┘
            │
            ▼
 ┌─────────────────────┐
-│  Module 2           │  환경별 구체화 + 명령어 생성
-│  Concrete Flow      │  - 환경 설명(MD) 결합
-│  Generation         │  - PowerShell 명령어 생성
-│                     │  - Top 3 technique 후보 추출
+│  Step 3             │  환경별 구체화 및 Technique 자동 선택
+│  Concrete Flow      │  - 환경 설명 결합
+│                     │  - 최적 MITRE Technique 자동 선택
 └──────────┬──────────┘
            │
            ▼
 ┌─────────────────────┐
-│  Module 3           │  최종 technique 선택
-│  Technique          │  - Top 3 → 최종 1개 선택
-│  Selection          │  - 누락 명령어 일괄 생성
-└──────────┬──────────┘
-           │
-           ▼
-┌─────────────────────┐
-│  Module 4           │  Caldera ability 생성
-│  Ability Generator  │  - YAML 형식 변환
-│                     │  - Payload/cleanup 추출
+│  Step 4             │  Caldera Ability 생성
+│  Ability Generator  │  - PowerShell 명령어 생성
+│                     │  - YAML 형식 변환
 │                     │  - Adversary profile 생성
 └──────────┬──────────┘
            │
            ▼
 ┌─────────────────────┐
-│  Module 5           │  시각화
-│  Visualization      │  - Execution order graph
-│                     │  - Dependency graph
-│                     │  - Tactic flow graph
+│  Step 5             │  Caldera 자동화 & Self-Correcting
+│  Automation         │  5-1. 업로드 (Abilities + Adversary)
+│                     │  5-2. Operation 실행
+│                     │  5-3. 결과 수집
+│                     │  5-4. AI 기반 자동 수정
+│                     │  5-5. 재업로드 및 재실행
+│                     │  5-6. 성공률 비교 출력
 └─────────────────────┘
 ```
-
-## 모듈 상세
-
-### Module 0: PDF Processing
-**입력**: KISA TTP 보고서 (PDF)
-**출력**: `step0_parsed.yml`
-
-- pypdf 기반 텍스트 추출
-- 페이지별 텍스트 구조화
-- YAML 형식 저장
-
-**실행**:
-```bash
-python modules/module0_pdf_processing.py data/raw/report.pdf data/processed/step0_parsed.yml
-```
-
----
-
-### Module 1: Abstract Flow Extraction
-**입력**: `step0_parsed.yml`
-**출력**: `step1_abstract_flow.yml`
-
-- 2단계 추출 (Overview → Detailed Flow)
-- 환경 독립적 attack goal 추출
-- MITRE ATT&CK tactic 자동 매핑
-- Kill chain 논리적 순서 재정렬
-
-**주요 특징**:
-- Chunk 기반 대용량 PDF 처리 (8K characters/chunk)
-- 의존성 기반 goal 재정렬
-- Command & Control tactic 제외 (Caldera가 제공)
-
-**실행**:
-```bash
-python modules/module1_abstract_flow.py data/processed/step0_parsed.yml data/processed/step1_abstract_flow.yml
-```
-
----
-
-### Module 2: Concrete Flow Generation
-**입력**: `step1_abstract_flow.yml`, `templates/environment_description.md`
-**출력**: `step2_concrete_flow.yml`
-
-- Abstract flow + 환경 설명 결합
-- 환경별 구체적 공격 단계 생성
-- **단일 라인 PowerShell 명령어 생성**
-- MITRE ATT&CK technique 후보 3개 추출 (mitreattack-python)
-
-**환경 설명 파일 (environment_description.md)**:
-- 네트워크 구성 (IP, 포트, 서비스)
-- 취약점 정보
-- Caldera payload 파일 목록
-- 인증 정보 (테스트 계정)
-
-**명령어 생성 원칙**:
-1. **Caldera payload 우선**: 환경 설명에 명시된 파일 사용
-2. **네이티브 도구 활용**: PowerShell, cmd.exe 등 OS 기본 도구
-3. **시뮬레이션 stub**: 도구 없을 시 echo 기반 시뮬레이션
-
-**실행**:
-```bash
-python modules/module2_concrete_flow.py \
-  data/processed/step1_abstract_flow.yml \
-  templates/environment_description.md \
-  data/processed/step2_concrete_flow.yml
-```
-
----
-
-### Module 3: Technique Selection
-**입력**: `step2_concrete_flow.yml`
-**출력**: `step3_technique_selected.yml`
-
-- Top 3 technique 후보 → 최종 1개 선택
-- 환경별 context 기반 AI 선택
-- 누락된 명령어 일괄 생성 (fallback)
-
-**선택 전략**:
-1. **자동 선택**: 단일 후보 또는 점수 차이 50%+ 시
-2. **AI 선택**: 환경 context 기반 최적 technique 선택
-3. **Fallback**: 오류 시 top candidate 사용
-
-**명령어 정리**:
-- 탭 → 공백 변환
-- 줄바꿈 제거
-- 연속 공백 축소
-- 단일 라인 보장
-
-**실행**:
-```bash
-python modules/module3_technique_selection.py \
-  data/processed/step2_concrete_flow.yml \
-  data/processed/step3_technique_selected.yml
-```
-
----
-
-### Module 4: Caldera Ability Generator
-**입력**: `step3_technique_selected.yml`
-**출력**: `abilities.yml`, `adversaries.yml`
-
-- Caldera YAML 형식 변환
-- Payload 파일 자동 추출 및 매핑
-- Adversary profile 생성 (atomic_ordering)
-- UUID 기반 deterministic ID 생성
-
-**생성 항목**:
-- **abilities.yml**: 개별 ability 정의 (38개)
-- **adversaries.yml**: Adversary profile (실행 순서 포함)
-
-**Ability 구조**:
-```yaml
-- ability_id: UUID
-  name: 공격 단계 이름
-  description: 설명
-  tactic: MITRE tactic
-  technique_id: MITRE technique ID
-  technique_name: Technique 이름
-  singleton: true
-  executors:
-  - name: psh
-    platform: windows
-    command: PowerShell 명령어 (단일 라인)
-    timeout: 20
-    payloads:
-    - payload_file.exe
-    uploads: []
-    cleanup: []
-```
-
-**실행**:
-```bash
-python modules/module4_ability_generator.py \
-  data/processed/step3_technique_selected.yml \
-  data/processed/caldera
-```
-
----
-
-### Module 5: Visualization
-**입력**: `abilities.yml`, `adversaries.yml`
-**출력**: 3종 시각화 (SVG/PNG)
-
-**생성 그래프**:
-
-#### 1. Execution Order Graph
-- 전체 38개 ability 실행 순서
-- Tactic별 색상 구분
-- Technique ID 표시
-- 범례 포함
-
-#### 2. Dependency Graph
-- Payload 파일 의존성 (노란색 노트)
-- Cleanup 명령 관계 (점선)
-- Ability 간 연결
-
-#### 3. Tactic Flow Graph
-- Kill chain 단순화 흐름
-- Tactic 전환 표시
-- 각 tactic의 ability 개수
-
-**Tactic 색상 매핑**:
-- Initial Access: 주황색
-- Execution: 연한 주황색
-- Privilege Escalation: 보라색
-- Discovery: 파란색
-- Lateral Movement: 밝은 파란색
-- Collection: 청록색
-- Exfiltration: 녹색
-
-**실행**:
-```bash
-python modules/module5_visualization.py \
-  data/processed/caldera/abilities.yml \
-  data/processed/caldera/adversaries.yml \
-  data/visualizations
-```
-
-**출력 파일**:
-- `execution_order.svg/png`
-- `dependencies.svg/png`
-- `tactic_flow.svg/png`
-
----
-
-### Module 5 (Alternative): ATT&CK Navigator
-**입력**: `abilities.yml`, `adversaries.yml`
-**출력**: `attack_navigator.json`
-
-- MITRE ATT&CK Navigator 레이어 생성
-- Technique coverage heatmap
-- Ability 상세 정보 포함 (comment)
-
-**사용 방법**:
-```bash
-python modules/module5_attack_navigator.py \
-  data/processed/caldera/abilities.yml \
-  data/processed/caldera/adversaries.yml \
-  data/processed/caldera/attack_navigator.json
-```
-
-**시각화**:
-1. https://mitre-attack.github.io/attack-navigator/ 접속
-2. "Open Existing Layer" → "Upload from local"
-3. `attack_navigator.json` 업로드
-4. Technique coverage 확인
-
----
 
 ## 설치
 
 ### 1. Python 환경 설정
+
 ```bash
 # Python 3.8+ 필요
 python -m venv venv
@@ -292,122 +69,94 @@ source venv/bin/activate  # Windows: venv\Scripts\activate
 ```
 
 ### 2. 의존성 설치
+
 ```bash
 pip install -r requirements.txt
 ```
 
-**requirements.txt**:
-```
-anthropic>=0.18.0
-pypdf>=3.0.0
-pyyaml>=6.0
-mitreattack-python==3.0.6
-graphviz>=0.20.0
-```
+### 3. 환경 변수 설정
 
-### 3. Graphviz 설치 (시각화용)
-- **Windows**: https://graphviz.org/download/ 에서 설치 후 PATH 추가
-- **Linux**: `sudo apt-get install graphviz`
-- **macOS**: `brew install graphviz`
+`.env` 파일을 생성하고 다음 내용을 입력:
 
-### 4. API Key 설정
 ```bash
-# .env 파일 생성
-echo "ANTHROPIC_API_KEY=your_api_key_here" > .env
-```
+# LLM 설정
+LLM_PROVIDER=claude
+ANTHROPIC_API_KEY=your_anthropic_api_key_here
+CLAUDE_MODEL=claude-sonnet-4-20250514
 
-또는 `modules/config.py`에서 직접 설정:
-```python
-ANTHROPIC_API_KEY = "your_api_key_here"
-CLAUDE_MODEL = "claude-sonnet-4-5-20250929"
+# Caldera 설정
+CALDERA_URL=http://your-caldera-server:8888
+CALDERA_API_KEY=your_caldera_api_key_here
 ```
-
----
 
 ## 사용 방법
 
-### 전체 파이프라인 실행
+### 전체 파이프라인 자동 실행
 
-**1단계별 실행**:
 ```bash
-# Step 0: PDF 파싱
-python modules/module0_pdf_processing.py \
-  data/raw/kisa_report.pdf \
-  data/processed/step0_parsed.yml
-
-# Step 1: Abstract flow 추출
-python modules/module1_abstract_flow.py \
-  data/processed/step0_parsed.yml \
-  data/processed/step1_abstract_flow.yml
-
-# Step 2: Concrete flow 생성
-python modules/module2_concrete_flow.py \
-  data/processed/step1_abstract_flow.yml \
-  templates/environment_description.md \
-  data/processed/step2_concrete_flow.yml
-
-# Step 3: Technique 선택
-python modules/module3_technique_selection.py \
-  data/processed/step2_concrete_flow.yml \
-  data/processed/step3_technique_selected.yml
-
-# Step 4: Caldera ability 생성
-python modules/module4_ability_generator.py \
-  data/processed/step3_technique_selected.yml \
-  data/processed/caldera
-
-# Step 5: 시각화
-python modules/module5_visualization.py \
-  data/processed/caldera/abilities.yml \
-  data/processed/caldera/adversaries.yml \
-  data/visualizations
+python main.py --step all --pdf "data/raw/report.pdf" --env "environment_description.md"
 ```
 
-**2. 자동화 스크립트 (선택)**:
+이 명령어는 다음을 자동으로 수행합니다:
+1. PDF 분석
+2. 추상/구체 공격 흐름 생성
+3. Caldera Ability 생성
+4. Caldera 업로드 및 Operation 실행
+5. 실패 분석 및 자동 수정
+6. 수정된 Ability 재업로드 및 재실행
+7. 성공률 비교 출력
+
+### 단계별 실행
+
 ```bash
-# scripts/run_pipeline.sh 생성 후 실행
-chmod +x scripts/run_pipeline.sh
-./scripts/run_pipeline.sh data/raw/report.pdf
+# Step 1: PDF 처리
+python main.py --step 1 --pdf "data/raw/report.pdf"
+
+# Step 2: 추상 공격 흐름 생성
+python main.py --step 2
+
+# Step 3: 구체적 공격 흐름 생성 (환경 설명 필수)
+python main.py --step 3 --env "environment_description.md"
+
+# Step 4: Caldera Ability 생성
+python main.py --step 4 --env "environment_description.md"
+
+# Step 5: Caldera 자동화 (업로드 → 실행 → Self-Correcting)
+python main.py --step 5 --env "environment_description.md"
 ```
 
----
+### 범위 지정 실행
 
-## 프로젝트 구조
+```bash
+# Step 1~3 실행
+python main.py --step 1~3 --pdf "data/raw/report.pdf" --env "environment_description.md"
 
-```
-.
-├── README.md                      # 본 문서
-├── requirements.txt               # Python 의존성
-├── modules/
-│   ├── config.py                  # API key 설정
-│   ├── module0_pdf_processing.py
-│   ├── module1_abstract_flow.py
-│   ├── module2_concrete_flow.py
-│   ├── module3_technique_selection.py
-│   ├── module4_ability_generator.py
-│   └── module5_visualization.py
-├── templates/
-│   └── environment_description.md # 환경 설정 템플릿
-├── data/
-│   ├── raw/                       # 원본 PDF 파일
-│   ├── processed/                 # 중간 산출물 (YAML)
-│   │   └── caldera/               # Caldera 최종 출력
-│   └── visualizations/            # 시각화 출력 (SVG/PNG)
-├── scripts/
-│   ├── upload_to_caldera.py       # Caldera API 업로드
-│   └── delete_from_caldera.py     # Caldera API 삭제
-└── docs/
-    └── midterm_report.md          # 중간 보고서
+# Step 3~5 실행 (이전 단계 결과가 있는 경우)
+python main.py --step 3~5 --env "environment_description.md"
 ```
 
----
+### 추가 옵션
 
-## 환경 설정 가이드
+```bash
+# 특정 Agent 대상 실행
+python main.py --step 5 --env "environment_description.md" --agent-paw "agent123"
 
-### environment_description.md 작성 예시
+# 업로드 건너뛰기 (이미 업로드된 경우)
+python main.py --step 5 --env "environment_description.md" --skip-upload
+
+# 자동 실행 건너뛰기 (수동 실행 후 Self-Correcting만)
+python main.py --step 5 --env "environment_description.md" --skip-execution
+
+# Operation 이름 지정
+python main.py --step 5 --env "environment_description.md" --operation-name "MyOperation"
+```
+
+## 환경 설정 파일 작성
+
+`environment_description.md` 파일에는 대상 환경의 상세 정보를 작성합니다:
 
 ```markdown
-# ttps1 환경 설명
+# 테스트 환경 설명
 
 ## 네트워크 구성
 
@@ -424,206 +173,245 @@ chmod +x scripts/run_pipeline.sh
 - 파일 업로드: http://192.168.56.105/upload_handler.asp
   - 방식: POST 요청, multipart/form-data
   - 폼 필드 이름: `file`
-  - 업로드 경로: /uploads/
 
-## 취약점 및 Exploit
+## 취약점
 
-1. **ASP 파일 업로드 취약점**
-   - 확장자 검증 없음
-   - 업로드 후 실행 가능
-
-2. **PrintSpoofer 권한 상승**
-   - SeImpersonatePrivilege 권한 활용
-   - 필요 파일: PrintSpoofer64.exe + vcruntime140.dll
-
-3. **SMB Admin Shares 접근**
-   - C$ 공유 접근 가능
-   - 계정은 웹 애플리케이션과 동일
+1. ASP 파일 업로드 취약점 (확장자 검증 없음)
+2. PrintSpoofer 권한 상승 (SeImpersonatePrivilege 활용)
+3. SMB Admin Shares 접근 가능
 
 ## Caldera Payload
 
 - cmd.asp (웹셸)
 - PrintSpoofer64.exe
 - vcruntime140.dll
-- deploy.ps1 (Caldera agent 배포 스크립트)
-
-## 데이터 유출
-
-- Caldera server 업로드 경로: /file/upload
-- 방식: POST 요청, -InFile 파라미터 사용
+- deploy.ps1
 ```
 
----
+## 출력 결과
 
-## Caldera 통합
+모든 결과는 `data/processed/YYYYMMDD_HHMMSS/` 디렉토리에 타임스탬프와 함께 저장됩니다:
 
-### Abilities 업로드
+```
+data/processed/20251209_025808/
+├── step1_parsed.yml                    # PDF 파싱 결과
+├── step2_abstract_flow.yml             # 추상 공격 흐름
+├── step3_concrete_flow.yml             # 구체적 공격 흐름
+├── step4_abilities.yml                 # Ability 중간 결과
+└── caldera/
+    ├── abilities.yml                   # Caldera Abilities (Self-Correcting 수정됨)
+    ├── adversaries.yml                 # Caldera Adversary Profile
+    ├── operation_report.json           # 초기 실행 결과
+    ├── operation_report_retry.json     # 재실행 결과
+    └── correction_report.json          # Self-Correcting 상세 리포트
+```
+
+### 성공률 비교 출력 예시
+
+```
+======================================================================
+성공률 비교
+======================================================================
+구분                   전체        성공        실패        성공률
+----------------------------------------------------------------------
+첫 번째 실행           37          24          13          64.9%
+재실행 (수정 후)       37          31          6           83.8%
+
+성공률 개선: +18.9% (24 → 31 성공)
+======================================================================
+```
+
+## 프로젝트 구조
+
+```
+.
+├── README.md
+├── requirements.txt
+├── main.py                            # 메인 실행 스크립트
+├── .env                               # 환경 변수 (API keys)
+├── environment_description.md         # 환경 설정 파일
+├── collect_retry_results.py           # 재실행 결과 수집 유틸리티
+├── modules/
+│   ├── ai/
+│   │   ├── base.py                    # LLM 베이스 클래스
+│   │   ├── claude.py                  # Claude API 클라이언트
+│   │   └── factory.py                 # LLM 팩토리 (환경변수 기반)
+│   ├── caldera/
+│   │   ├── uploader.py                # Caldera 업로드
+│   │   ├── executor.py                # Operation 실행 및 제어
+│   │   ├── reporter.py                # 결과 수집
+│   │   └── deleter.py                 # 리소스 삭제
+│   ├── core/
+│   │   ├── config.py                  # 환경 변수 로드
+│   │   └── models.py                  # 데이터 모델
+│   ├── prompts/
+│   │   ├── manager.py                 # 프롬프트 템플릿 관리
+│   │   └── templates/                 # YAML 프롬프트 템플릿
+│   │       ├── step2_overview.yaml
+│   │       ├── step2_chunk.yaml
+│   │       ├── step2_synthesize.yaml
+│   │       ├── step3_generate_flow.yaml
+│   │       ├── step4_generate_command.yaml
+│   │       ├── step4_validate_command.yaml
+│   │       └── step5_fix_ability.yaml
+│   └── steps/
+│       ├── step1_pdf_processing.py    # PDF 처리
+│       ├── step2_abstract_flow.py     # 추상 흐름 생성
+│       ├── step3_concrete_flow.py     # 구체 흐름 생성 & Technique 자동 선택
+│       ├── step4_ability_generator.py # PowerShell 명령어 & Ability 생성
+│       └── step5_self_correcting.py   # Self-Correcting 엔진
+├── data/
+│   ├── raw/                           # 원본 PDF
+│   └── processed/                     # 처리 결과 (타임스탬프별)
+└── scripts/
+    ├── upload_to_caldera.py           # Caldera 업로드 유틸리티
+    └── delete_from_caldera.py         # Caldera 삭제 유틸리티
+```
+
+## Self-Correcting 엔진
+
+Step 5의 Self-Correcting 엔진은 실패한 Ability를 자동으로 분석하고 수정합니다.
+
+### 실패 유형 분류
+
+1. **syntax_error**: PowerShell 구문 오류
+2. **missing_env**: 환경 설정 값 누락 (IP, 경로 등)
+3. **caldera_constraint**: Caldera 제약사항 (변수 의존성 등)
+4. **dependency_error**: 권한 부족
+5. **unrecoverable**: 복구 불가능 (도구 미설치 등)
+
+### 수정 전략
+
+각 실패 유형에 맞는 전략으로 명령어를 자동 수정:
+- 구문 오류 수정 (PowerShell 5.1 호환성)
+- 환경 설명 기반 실제 값 대체
+- 변수 의존성 제거 (self-contained 명령어로 변환)
+- 권한 상승 없는 대체 방법 사용
+
+### 자동 재실행
+
+수정된 Ability를 자동으로 재업로드하고 새 Operation을 실행하여 개선 효과를 즉시 확인할 수 있습니다.
+
+## 유틸리티 스크립트
+
+### 재실행 결과 수집
+
+타임아웃 등으로 재실행 결과를 놓친 경우:
+
 ```bash
-python scripts/upload_to_caldera.py \
-  --server http://localhost:8888 \
-  --apikey YOUR_API_KEY \
-  --abilities data/processed/caldera/abilities.yml
+python collect_retry_results.py 20251209_025808
 ```
 
-### Adversary 업로드
+Caldera에서 재실행 Operation을 찾아 결과를 수집하고 성공률을 비교합니다.
+
+### Caldera 리소스 삭제
+
 ```bash
-python scripts/upload_to_caldera.py \
-  --server http://localhost:8888 \
-  --apikey YOUR_API_KEY \
-  --adversary data/processed/caldera/adversaries.yml
+# Adversary 삭제
+python scripts/delete_from_caldera.py --adversary "KISA TTP Adversary"
+
+# Ability 삭제
+python scripts/delete_from_caldera.py --ability "ability-id-here"
 ```
 
-### 삭제
-```bash
-python scripts/delete_from_caldera.py \
-  --server http://localhost:8888 \
-  --apikey YOUR_API_KEY \
-  --adversary "KISA TTP Adversary"
-```
+## 명령어 옵션 상세
 
----
+### --step
+실행할 단계 지정 (필수)
+- 단일 단계: `--step 1`, `--step 5`
+- 범위: `--step 1~3`, `--step 3~5`
+- 전체: `--step all`
 
-## 출력 예시
+### --pdf
+입력 PDF 파일 경로 (Step 1 실행 시 필수)
 
-### Tactic 분포 (Step 4 출력)
-```
-Tactic 분포:
-  - collection: 4개
-  - credential-access: 1개
-  - defense-evasion: 4개
-  - discovery: 14개
-  - exfiltration: 3개
-  - initial-access: 3개
-  - lateral-movement: 3개
-  - persistence: 2개
-  - privilege-escalation: 4개
-```
+### --env
+환경 설명 MD 파일 경로 (Step 3 이상 실행 시 필수)
 
-### Ability 예시
-```yaml
-- ability_id: bce5dfd5-f459-5b57-bf7a-0f5737f7daf4
-  name: Web Application Login
-  description: Authenticate to web application using compromised credentials
-  tactic: initial-access
-  technique_id: T1133
-  technique_name: External Remote Services
-  singleton: true
-  executors:
-  - name: psh
-    platform: windows
-    command: $body = @{userid='admin'; password='P@ssw0rd!2020'}; ...
-    timeout: 20
-    payloads: []
-```
+### --agent-paw
+특정 Caldera Agent 지정 (선택사항)
+- 생략 시 모든 연결된 에이전트 대상
 
----
+### --skip-upload
+Step 5에서 업로드 단계 건너뛰기
+- 이미 업로드된 Ability를 재사용할 때 사용
 
-## 제약사항 및 주의사항
+### --skip-execution
+Step 5에서 자동 실행 건너뛰기
+- 수동으로 Operation을 실행한 후 Self-Correcting만 수행할 때 사용
 
-### PowerShell 제약
-- **PowerShell 5.1 호환**: `-Form`, `-SkipCertificateCheck` 사용 불가
-- **단일 라인 명령어**: 줄바꿈 없이 세미콜론으로 체인
-- **변수 공유 불가**: 각 ability는 독립적으로 실행
+### --operation-name
+Operation 이름 지정 (선택사항)
+- 기본값: `Auto-Operation-<timestamp>`
 
-### Caldera Payload
-- 환경 설명에 명시된 파일만 자동 매핑
-- Payload는 Caldera가 자동으로 agent 작업 디렉토리에 배치
-- 다운로드 URL 불필요 (Caldera 자동 처리)
-
-### API 제한
-- Claude API rate limit 주의 (대용량 PDF 처리 시)
-- Token 사용량: Step 2/3에서 집중 소모
-
----
+### --output-dir
+출력 디렉토리 지정 (선택사항)
+- 기본값: `data/processed`
 
 ## 트러블슈팅
 
-### 1. "MITRE ATT&CK data not available"
-**원인**: mitreattack-python 미설치 또는 데이터 파일 누락
-**해결**:
+### MITRE ATT&CK 데이터 오류
+
 ```bash
 pip install mitreattack-python==3.0.6
-# enterprise-attack.json 다운로드
-wget https://raw.githubusercontent.com/mitre-attack/attack-stix-data/master/enterprise-attack/enterprise-attack.json
 ```
 
-### 2. Graphviz 렌더링 오류
-**원인**: Graphviz 실행 파일이 PATH에 없음
-**해결**:
-- Windows: 환경변수 PATH에 `C:\Program Files\Graphviz\bin` 추가
-- Linux/macOS: `which dot` 확인 후 재설치
+### API Key 오류
 
-### 3. API Key 오류
-**원인**: ANTHROPIC_API_KEY 미설정
-**해결**:
+`.env` 파일에 올바른 API key가 설정되어 있는지 확인:
+
 ```bash
-export ANTHROPIC_API_KEY="your_key_here"
-# 또는 .env 파일 생성
+ANTHROPIC_API_KEY=sk-ant-...
+CALDERA_API_KEY=...
 ```
 
-### 4. "No commands found in Step 3"
-**원인**: Module 2에서 명령어 생성 실패
-**해결**:
-- `environment_description.md`에 충분한 정보 제공
-- Module 3의 fallback 메커니즘이 자동으로 재생성
+### Caldera 연결 오류
 
-### 5. Tactic이 모두 'execution'으로 표시
-**원인**: Module 4의 tactic 매핑 버그 (이미 수정됨)
-**해결**: 최신 코드 사용 (`node.get('tactic')` 사용)
+Caldera 서버 URL과 API Key 확인:
 
----
+```bash
+curl -H "KEY: your_api_key" http://your-caldera-server:8888/api/v2/abilities
+```
 
-## 성능 최적화
+### PowerShell 명령어 실행 실패
 
-### Token 사용량 절감
-- Module 1: Chunk size 조정 (기본 8K)
-- Module 2: 프롬프트 간소화
-- Module 3: Auto-selection 활용 (점수 차이 50%+)
+환경 설명 파일에 충분한 정보가 포함되어 있는지 확인:
+- 정확한 IP 주소 및 포트
+- 올바른 인증 정보
+- 필요한 Payload 파일 목록
 
-### 처리 속도
-- **평균 실행 시간**:
-  - Module 0: ~10초 (10페이지 PDF 기준)
-  - Module 1: ~2분 (chunk 기반)
-  - Module 2: ~3분 (노드 수에 비례)
-  - Module 3: ~1분 (후보 선택)
-  - Module 4: ~5초 (변환만)
-  - Module 5: ~3초 (시각화)
+Self-Correcting이 자동으로 많은 오류를 수정하지만, 환경 정보가 부정확하면 수정이 불가능합니다.
 
----
+## 기술적 특징
 
-## 향후 개선 사항
+### PowerShell 5.1 호환
+모든 명령어는 Windows PowerShell 5.1 기준으로 생성되며, 최신 PowerShell Core 전용 cmdlet은 사용하지 않습니다.
 
-- [ ] 다국어 보고서 지원 (영문 KISA 보고서)
-- [ ] Linux/macOS 명령어 생성 (현재 Windows/PowerShell만)
-- [ ] Cleanup 명령어 자동 생성
-- [ ] Technique sub-technique 지원
-- [ ] Batch 처리 (여러 보고서 동시 처리)
-- [ ] Web UI 개발
+### 단일 라인 명령어
+Caldera 제약으로 모든 명령어는 단일 라인으로 생성됩니다. 여러 명령은 세미콜론으로 연결합니다.
 
----
+### Self-Contained Abilities
+각 Ability는 독립적으로 실행되어 변수를 공유할 수 없습니다. 모든 필요한 값은 명령어 내에 포함됩니다.
 
-## 라이선스
+### Jitter 설정
+Operation 생성 시 jitter를 `1/1`로 설정하여 Ability 간 지연을 최소화합니다.
 
-MIT License
+### 무제한 대기
+Operation 완료를 기다릴 때 시간 제한이 없습니다. 완료될 때까지 무한정 대기합니다.
 
----
+## 제약사항
 
-## 기여
-
-이슈 및 Pull Request 환영합니다.
-
----
+- **Windows 전용**: 현재 Windows/PowerShell 명령어만 지원
+- **PowerShell 5.1**: PowerShell 5.1 호환 명령어만 생성
+- **환경 의존성**: 정확한 환경 설명 파일 필수
 
 ## 참고 자료
 
 - [MITRE Caldera](https://github.com/mitre/caldera)
 - [MITRE ATT&CK](https://attack.mitre.org/)
-- [ATT&CK Navigator](https://mitre-attack.github.io/attack-navigator/)
 - [mitreattack-python](https://github.com/mitre-attack/mitreattack-python)
 - [Claude API](https://docs.anthropic.com/)
 
----
+## 라이선스
 
-## 연락처
-
-프로젝트 관련 문의: [이슈 생성](https://github.com/YOUR_REPO/issues)
+MIT License

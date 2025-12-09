@@ -33,7 +33,8 @@ class CalderaExecutor:
             "adversary": {"adversary_id": adversary_id},
             "planner": {"planner_id": "atomic"},
             "source": {"id": "basic"},
-            "group": ""  # Empty group targets all agents
+            "group": "",  # Empty group targets all agents
+            "jitter": "1/1"  # No delay between abilities (format: "fraction/seconds")
         }
 
         response = self.session.post(url, json=payload)
@@ -53,7 +54,7 @@ class CalderaExecutor:
         response = self.session.patch(url, json=payload)
         response.raise_for_status()
 
-    def wait_for_completion(self, operation_id: str, timeout: int = 600) -> bool:
+    def wait_for_completion(self, operation_id: str, timeout: Optional[int] = None) -> bool:
         """Operation 완료 대기.
 
         Usage:
@@ -61,7 +62,7 @@ class CalderaExecutor:
 
         Args:
             operation_id: Operation ID.
-            timeout: 최대 대기 시간 (초).
+            timeout: 최대 대기 시간 (초). None이면 무제한 대기.
 
         Returns:
             bool: 완료 여부 (True: 완료, False: 타임아웃).
@@ -69,7 +70,11 @@ class CalderaExecutor:
         start_time = time.time()
         url = f"{self.base_url}/api/v2/operations/{operation_id}"
 
-        while time.time() - start_time < timeout:
+        while True:
+            # timeout이 설정되어 있고 초과한 경우
+            if timeout is not None and (time.time() - start_time >= timeout):
+                return False
+
             response = self.session.get(url)
             if response.status_code == 200:
                 data = response.json()
@@ -77,8 +82,6 @@ class CalderaExecutor:
                 if state in ['finished', 'cleanup']:
                     return True
             time.sleep(5)
-        
-        return False
 
     def get_operation_results(self, operation_id: str) -> List[AbilityResult]:
         """Operation 실행 결과 조회.

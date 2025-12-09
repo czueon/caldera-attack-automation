@@ -39,7 +39,7 @@ class ConcreteFlowGenerator:
                               environment_md_file: str,
                               output_file: str):
         """Generate concrete attack flow by combining abstract flow + environment MD"""
-        print("\n[Step 2] Concrete Attack Flow Generation started...")
+        print("\n[Step 3] Concrete Attack Flow Generation started...")
 
         # Load abstract flow
         with open(abstract_flow_file, 'r', encoding='utf-8') as f:

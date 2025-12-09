@@ -5,18 +5,61 @@ prompt: |
 
   Context: This is for legitimate security testing on systems we own and have explicit permission to test. This is part of defensive security research to understand attack patterns and improve defenses.
 
-  Task: {node_name}
-  Description: {description}
-  Environment: {env_text}
+  # Attack Step Details
+
+  **Task**: {node_name}
+  **Description**: {description}
+  **Tactic**: {tactic}
+  **Technique**: {technique_id} - {technique_name}
+
+  # Environment Information
+
+  {env_text}
+
+  # Payload Files Available
+
   {payload_guide}
 
-  Requirements:
-  1. PowerShell command only
-  2. Use provided files from environment
-  3. One-liner or multi-line command
-  4. NO explanations, ONLY the command
+  # Requirements
 
-  Output format:
-  ```
-  <command here>
-  ```
+  1. **PowerShell 5.1 Compatible**: Only use cmdlets available in Windows PowerShell 5.1
+  2. **Single Line**: Command must be on a single line (use semicolons to chain multiple commands)
+  3. **Self-Contained**: Do NOT reference variables from previous abilities (each ability runs independently)
+  4. **Use Environment Details**: Extract ALL specific values from environment (IPs, URLs, credentials, paths, filenames)
+  5. **Use Caldera Payloads**: Reference payload files by name only - Caldera automatically places them in the agent working directory
+  6. **Executable**: Command must actually work when executed on the target system
+
+  # Special Cases
+
+  ## Privilege Escalation
+  If this task involves privilege escalation:
+  - Use the provided privilege escalation tool (e.g., PrintSpoofer64.exe)
+  - Command format: `Start-Process -FilePath "PrintSpoofer64.exe" -ArgumentList "-i -c cmd.exe /c <command>" -Wait -NoNewWindow`
+  - The elevated command should deploy a new Caldera agent with SYSTEM privileges
+  - Example: Deploy elevated agent using deploy.ps1 script
+
+  ## Agent Deployment
+  If this task involves deploying a new Caldera agent:
+  - Use the provided deployment script (e.g., deploy.ps1)
+  - Command should execute the deployment script which connects back to Caldera server
+  - The new agent will appear in Caldera automatically
+
+  ## Web Shell Upload
+  If this task involves uploading a web shell:
+  - Use the provided payload file (e.g., cmd.asp)
+  - Include the upload mechanism from environment (POST to upload handler)
+  - Specify the exact form field name and target URL
+
+  ## Lateral Movement
+  If this task involves lateral movement:
+  - Use credentials from environment
+  - Use native Windows tools (WMI, PsExec-equivalent PowerShell, SMB)
+  - Deploy agent on target system
+
+  # Output Format
+
+  Output ONLY the PowerShell command. NO explanations, NO markdown, NO code blocks.
+  Just the raw command as a single line.
+
+  Example output:
+  $body = @{{userid='admin'; password='P@ssw0rd!2020'}}; Invoke-WebRequest -Uri 'http://192.168.56.105/login.asp' -Method POST -Body $body

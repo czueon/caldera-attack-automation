@@ -296,14 +296,9 @@ def main():
             print(f"  [OK] Operation 실행 시작")
 
             # 완료 대기
-            print(f"  Operation 완료 대기 중 (최대 10분)...")
-            completed = executor.wait_for_completion(op_id, timeout=600)
-
-            if not completed:
-                print(f"  [WARNING] Operation이 10분 내에 완료되지 않았습니다.")
-                print(f"  [INFO] 수동으로 확인 후 진행하세요.")
-            else:
-                print(f"  [OK] Operation 완료")
+            print(f"  Operation 완료 대기 중...")
+            executor.wait_for_completion(op_id, timeout=None)
+            print(f"  [OK] Operation 완료")
 
             # 5-3. 결과 수집
             print("\n[5-3] 결과 수집")
@@ -382,53 +377,49 @@ def main():
                 print(f"  [OK] Operation 실행 시작")
 
                 # 완료 대기
-                print(f"  Operation 완료 대기 중 (최대 10분)...")
-                completed = executor.wait_for_completion(op_id_retry, timeout=600)
+                print(f"  Operation 완료 대기 중...")
+                executor.wait_for_completion(op_id_retry, timeout=None)
+                print(f"  [OK] Operation 완료")
 
-                if completed:
-                    print(f"  [OK] Operation 완료")
+                # 재실행 결과 수집
+                reporter = CalderaReporter()
+                retry_report = reporter.collect_full_outputs(op_id_retry)
 
-                    # 재실행 결과 수집
-                    reporter = CalderaReporter()
-                    retry_report = reporter.collect_full_outputs(op_id_retry)
+                if retry_report:
+                    # 재실행 리포트 저장
+                    retry_report_file = f"{caldera_output_dir}/operation_report_retry.json"
+                    reporter.save_report(retry_report, retry_report_file)
+                    print(f"  [OK] 재실행 리포트 저장: {retry_report_file}")
 
-                    if retry_report:
-                        # 재실행 리포트 저장
-                        retry_report_file = f"{caldera_output_dir}/operation_report_retry.json"
-                        reporter.save_report(retry_report, retry_report_file)
-                        print(f"  [OK] 재실행 리포트 저장: {retry_report_file}")
+                    # 재실행 통계 계산
+                    retry_stats = retry_report.get('statistics', {})
+                    retry_total = retry_stats.get('total_abilities', 0)
+                    retry_success = retry_stats.get('success', 0)
+                    retry_failed = retry_stats.get('failed', 0)
 
-                        # 재실행 통계 계산
-                        retry_stats = retry_report.get('statistics', {})
-                        retry_total = retry_stats.get('total_abilities', 0)
-                        retry_success = retry_stats.get('success', 0)
-                        retry_failed = retry_stats.get('failed', 0)
+                    # 성공률 비교 출력
+                    print("\n" + "="*70)
+                    print("성공률 비교")
+                    print("="*70)
+                    print(f"{'구분':<20} {'전체':<10} {'성공':<10} {'실패':<10} {'성공률':<10}")
+                    print("-"*70)
 
-                        # 성공률 비교 출력
-                        print("\n" + "="*70)
-                        print("성공률 비교")
-                        print("="*70)
-                        print(f"{'구분':<20} {'전체':<10} {'성공':<10} {'실패':<10} {'성공률':<10}")
-                        print("-"*70)
+                    first_rate = (first_success / first_total * 100) if first_total > 0 else 0
+                    retry_rate = (retry_success / retry_total * 100) if retry_total > 0 else 0
 
-                        first_rate = (first_success / first_total * 100) if first_total > 0 else 0
-                        retry_rate = (retry_success / retry_total * 100) if retry_total > 0 else 0
+                    print(f"{'첫 번째 실행':<20} {first_total:<10} {first_success:<10} {first_failed:<10} {first_rate:.1f}%")
+                    print(f"{'재실행 (수정 후)':<20} {retry_total:<10} {retry_success:<10} {retry_failed:<10} {retry_rate:.1f}%")
 
-                        print(f"{'첫 번째 실행':<20} {first_total:<10} {first_success:<10} {first_failed:<10} {first_rate:.1f}%")
-                        print(f"{'재실행 (수정 후)':<20} {retry_total:<10} {retry_success:<10} {retry_failed:<10} {retry_rate:.1f}%")
-
-                        improvement = retry_rate - first_rate
-                        if improvement > 0:
-                            print(f"\n✓ 성공률 개선: +{improvement:.1f}% ({first_success} → {retry_success} 성공)")
-                        elif improvement < 0:
-                            print(f"\n✗ 성공률 감소: {improvement:.1f}%")
-                        else:
-                            print(f"\n- 성공률 동일")
-                        print("="*70)
+                    improvement = retry_rate - first_rate
+                    if improvement > 0:
+                        print(f"\n✓ 성공률 개선: +{improvement:.1f}% ({first_success} → {retry_success} 성공)")
+                    elif improvement < 0:
+                        print(f"\n✗ 성공률 감소: {improvement:.1f}%")
                     else:
-                        print("  [WARNING] 재실행 결과 수집 실패")
+                        print(f"\n- 성공률 동일")
+                    print("="*70)
                 else:
-                    print(f"  [WARNING] 재실행이 10분 내에 완료되지 않았습니다.")
+                    print("  [WARNING] 재실행 결과 수집 실패")
             else:
                 print("  [INFO] --skip-execution 옵션으로 자동 재실행을 건너뜁니다.")
                 print("  [INFO] 수동으로 재실행 후 결과를 확인하세요.")

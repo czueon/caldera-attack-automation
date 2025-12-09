@@ -305,7 +305,15 @@ class AbilityGenerator:
             if isinstance(payload_list, list):
                 payloads.extend(payload_list)
 
-        # 2. 중복 제거
+        # 2. dependencies 필드도 payload로 처리
+        if 'dependencies' in environment_specific:
+            deps = environment_specific['dependencies']
+            if isinstance(deps, list):
+                payloads.extend(deps)
+            elif isinstance(deps, str):
+                payloads.append(deps)
+
+        # 3. 중복 제거
         payloads = list(set(payloads))
 
         return payloads

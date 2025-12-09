@@ -138,14 +138,19 @@ class AbilityGenerator:
 
         print(f"  [생성 중] {node_id}. {node_name} ({technique_id})")
 
-        # 1. Generate command using LLM (Step 4 responsibility)
-        command = self._generate_command_only(node)
-        if not command:
-            print(f"  [WARNING] {node_name} Command generation failed - skipping")
-            self.failed_nodes.append({'id': node_id, 'name': node_name, 'reason': 'Command generation failed'})
-            return None
+        # 1. Command 추출 (Step 3에서 생성된 것 사용)
+        if 'commands' in environment_specific and environment_specific['commands']:
+            existing_commands = environment_specific['commands']
+            if isinstance(existing_commands, list):
+                command = '\n'.join(existing_commands)
+            else:
+                command = existing_commands
 
-        print(f"    [OK] Command: {command[:80]}..." if len(command) > 80 else f"    [OK] Command: {command}")
+            print(f"    [OK] Command from Step 3: {command[:80]}..." if len(command) > 80 else f"    [OK] Command: {command}")
+        else:
+            print(f"  [WARNING] {node_name} No commands found in Step 3 - skipping")
+            self.failed_nodes.append({'id': node_id, 'name': node_name, 'reason': 'No commands in Step 3'})
+            return None
 
         # 2. 전처리: Payload 파일 추출
         payloads = self._extract_payloads_from_environment(environment_specific)

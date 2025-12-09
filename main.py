@@ -130,6 +130,14 @@ def main():
         help="중간 결과 저장 디렉토리 (기본: data/processed)"
     )
 
+    # 버전 ID (미지정 시 타임스탬프 자동 생성)
+    parser.add_argument(
+        "--version-id",
+        type=str,
+        default=None,
+        help="결과 버전 ID (예: 20251209_153000). 생략 시 현재 시각으로 자동 생성."
+    )
+
     args = parser.parse_args()
 
     print("="*70)
@@ -146,14 +154,27 @@ def main():
     print(f"실행 Step: {', '.join(map(str, steps))}")
     print("="*70)
 
-    # 현재 시간 기반 타임스탬프 폴더 생성
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    timestamped_output_dir = os.path.join(args.output_dir, timestamp)
+    # pdf 파일명 기반 스템과 version_id 결정
+    if not args.pdf:
+        print("[ERROR] --pdf 인자가 필요합니다 (결과 경로 규칙: data/processed/{pdf_stem}/{version_id}/)")
+        sys.exit(1)
 
-    # 출력 디렉토리 생성
-    Path(timestamped_output_dir).mkdir(parents=True, exist_ok=True)
+    pdf_stem = Path(args.pdf).stem
+    version_id = args.version_id or datetime.now().strftime("%Y%m%d_%H%M%S")
 
-    print(f"결과 저장 위치: {timestamped_output_dir}")
+    # 결과 루트: data/processed/{pdf_stem}/{version_id}
+    base_dir = Path(args.output_dir) / pdf_stem / version_id
+    base_dir.mkdir(parents=True, exist_ok=True)
+
+    # 스텝별 기본 출력 경로 (파일명은 step1.yml, step2.yml, step3.yml)
+    step1_output = base_dir / "step1.yml"
+    step2_output = base_dir / "step2.yml"
+    step3_output = base_dir / "step3.yml"
+    caldera_output_dir = base_dir / "caldera"
+
+    print(f"결과 저장 루트: {base_dir}")
+    print(f"  - PDF: {pdf_stem}")
+    print(f"  - Version ID: {version_id}")
     print("="*70)
 
     # Step 1: PDF Processing
@@ -165,24 +186,21 @@ def main():
         print("\n[Step 1] PDF Processing")
         print("-" * 70)
 
-        step1_output = f"{timestamped_output_dir}/step1_parsed.yml"
         processor = PDFProcessor()
-        processor.process_pdf(args.pdf, step1_output)
+        # version_id를 명시적으로 전달하여 동일 버전으로 연결
+        processor.process_pdf(args.pdf, output_path=str(step1_output), version_id=version_id)
 
     # Step 2: Abstract Flow Extraction
     if 2 in steps:
         print("\n[Step 2] Abstract Attack Flow Extraction")
         print("-" * 70)
 
-        step1_output = f"{timestamped_output_dir}/step1_parsed.yml"
-        step2_output = f"{timestamped_output_dir}/step2_abstract_flow.yml"
-
         if not Path(step1_output).exists():
             print(f"[ERROR] {step1_output} 파일이 없습니다. Step 1을 먼저 실행하세요.")
             sys.exit(1)
 
         extractor = AbstractFlowExtractor()
-        extractor.extract_abstract_flow(step1_output, step2_output)
+        extractor.extract_abstract_flow(str(step1_output), str(step2_output), version_id=version_id)
 
     # Step 3: Concrete Flow Generation with Technique Selection
     if 3 in steps:
@@ -194,9 +212,6 @@ def main():
         print("\n[Step 3] Concrete Attack Flow Generation (with Technique Selection)")
         print("-" * 70)
 
-        step2_output = f"{timestamped_output_dir}/step2_abstract_flow.yml"
-        step3_output = f"{timestamped_output_dir}/step3_concrete_flow.yml"
-
         if not Path(step2_output).exists():
             print(f"[ERROR] {step2_output} 파일이 없습니다. Step 2를 먼저 실행하세요.")
             sys.exit(1)
@@ -206,32 +221,27 @@ def main():
             sys.exit(1)
 
         generator = ConcreteFlowGenerator()
-        generator.generate_concrete_flow(step2_output, args.env, step3_output)
+        generator.generate_concrete_flow(str(step2_output), args.env, str(step3_output), version_id=version_id)
 
     # Step 4: Caldera Ability Generation
     if 4 in steps:
         print("\n[Step 4] Caldera Ability Generation")
         print("-" * 70)
 
-        step3_output = f"{timestamped_output_dir}/step3_concrete_flow.yml"
-
         if not Path(step3_output).exists():
             print(f"[ERROR] {step3_output} 파일이 없습니다. Step 3을 먼저 실행하세요.")
             sys.exit(1)
 
-        caldera_output_dir = f"{timestamped_output_dir}/caldera"
-
         generator = AbilityGenerator()
-        generator.generate_abilities(step3_output, caldera_output_dir)
+        generator.generate_abilities(str(step3_output), str(caldera_output_dir))
 
     # Step 5: Caldera Automation (Upload → Execute → Self-Correct)
     if 5 in steps:
         print("\n[Step 5] Caldera 자동화 (업로드 → 실행 → Self-Correcting)")
         print("-" * 70)
 
-        caldera_output_dir = f"{timestamped_output_dir}/caldera"
-        abilities_file = f"{caldera_output_dir}/abilities.yml"
-        adversaries_file = f"{caldera_output_dir}/adversaries.yml"
+        abilities_file = caldera_output_dir / "abilities.yml"
+        adversaries_file = caldera_output_dir / "adversaries.yml"
 
         if not Path(abilities_file).exists():
             print("[ERROR] abilities.yml 파일이 없습니다. Step 4를 먼저 실행하세요.")
@@ -253,8 +263,8 @@ def main():
             print("-" * 70)
 
             uploader = CalderaUploader()
-            uploader.upload_abilities(abilities_file)
-            adversary_ids = uploader.upload_adversaries(adversaries_file)
+            uploader.upload_abilities(str(abilities_file))
+            adversary_ids = uploader.upload_adversaries(str(adversaries_file))
 
             if not adversary_ids:
                 print("[ERROR] Adversary 업로드 실패")
@@ -312,8 +322,8 @@ def main():
                 sys.exit(1)
 
             # 리포트 저장
-            operation_report_file = f"{caldera_output_dir}/operation_report.json"
-            reporter.save_report(report, operation_report_file)
+            operation_report_file = caldera_output_dir / "operation_report.json"
+            reporter.save_report(report, str(operation_report_file))
             print(f"\n[OK] 리포트 저장: {operation_report_file}")
         else:
             print("\n[SKIP] 자동 실행 건너뜀")
@@ -321,7 +331,7 @@ def main():
             print("[INFO] operation_report.json을 caldera/ 디렉토리에 저장하세요.")
 
             # 기존 리포트 파일 확인
-            operation_report_file = f"{caldera_output_dir}/operation_report.json"
+            operation_report_file = caldera_output_dir / "operation_report.json"
             if not Path(operation_report_file).exists():
                 print(f"\n[ERROR] {operation_report_file} 파일이 없습니다.")
                 print("[INFO] Operation 실행 후 리포트를 저장하고 다시 실행하세요.")
@@ -331,7 +341,7 @@ def main():
         print("\n[5-4] Self-Correcting (실패한 Ability 수정)")
         print("-" * 70)
 
-        # 첫 번째 실행 통계 저장
+        # 첫 번째 실행 통계 저장 (Self-Correcting 전 초기 리포트 확보)
         with open(operation_report_file, 'r', encoding='utf-8') as f:
             first_report = json.load(f)
 
@@ -343,10 +353,10 @@ def main():
 
         corrector = OfflineCorrector()
         correction_report = corrector.run(
-            abilities_file=abilities_file,
-            operation_report_file=operation_report_file,
+            abilities_file=str(abilities_file),
+            operation_report_file=str(operation_report_file),
             env_description_file=args.env,
-            output_dir=caldera_output_dir
+            output_dir=str(caldera_output_dir)
         )
 
         # 수정된 ability 개수 확인
@@ -359,7 +369,7 @@ def main():
             # 수정된 abilities 재업로드
             print("  수정된 abilities 재업로드 중...")
             uploader = CalderaUploader()
-            uploader.upload_abilities(abilities_file)
+            uploader.upload_abilities(str(abilities_file))
             print("  [OK] 재업로드 완료")
 
             if not args.skip_execution:
@@ -386,9 +396,9 @@ def main():
                 retry_report = reporter.collect_full_outputs(op_id_retry)
 
                 if retry_report:
-                    # 재실행 리포트 저장
-                    retry_report_file = f"{caldera_output_dir}/operation_report_retry.json"
-                    reporter.save_report(retry_report, retry_report_file)
+                    # 재실행 리포트 저장 (Path 사용 후 문자열 변환)
+                    retry_report_file = caldera_output_dir / "operation_report_retry.json"
+                    reporter.save_report(retry_report, str(retry_report_file))
                     print(f"  [OK] 재실행 리포트 저장: {retry_report_file}")
 
                     # 재실행 통계 계산

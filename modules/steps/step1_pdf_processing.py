@@ -1,11 +1,12 @@
 """
-Module 0: PDF Processing
+Module 1: PDF Processing
 Extract text from PDF reports page by page
 """
 
 import os
 from pathlib import Path
 from typing import Dict, Any, List
+from datetime import datetime
 import yaml
 import pdfplumber
 from dotenv import load_dotenv
@@ -16,24 +17,29 @@ load_dotenv()
 class PDFProcessor:
     """Convert KISA TTPs PDF to structured data (page-based extraction)"""
 
-    def process_pdf(self, pdf_path: str, output_path: str = None) -> Dict[str, Any]:
+    def process_pdf(self, pdf_path: str, output_path: str = None, version_id: str = None) -> Dict[str, Any]:
         """Extract PDF text page by page and save"""
         print(f"[PDF] Processing PDF: {pdf_path}")
 
         pages_data = self._extract_pages(pdf_path)
-        toc_info = self._find_table_of_contents(pages_data)
+
+        pdf_stem = Path(pdf_path).stem
+        # version_id가 없으면 타임스탬프로 생성하여 폴더/파일명에 포함
+        version_id = version_id or datetime.now().strftime("%Y%m%d_%H%M%S")
 
         result = {
             "metadata": {
                 "source": pdf_path,
+                "pdf_name": pdf_stem,
+                "version_id": version_id,
                 "total_pages": len(pages_data)
             },
-            "table_of_contents": toc_info,
             "pages": pages_data
         }
 
         if output_path is None:
-            output_path = "data/processed/step1_parsed.yml"
+            # 지정 경로 없으면 data/processed/{pdf이름}/{version_id}/{pdf이름}_parsed.yml로 저장
+            output_path = Path("../../data/processed") / pdf_stem / version_id / f"{pdf_stem}_parsed.yml"
 
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
         with open(output_path, 'w', encoding='utf-8') as f:
@@ -41,7 +47,6 @@ class PDFProcessor:
 
         print(f"[SUCCESS] Saved to: {output_path}")
         print(f"  - Total pages: {len(pages_data)}")
-        print(f"  - TOC found: {'Yes' if toc_info else 'No'}")
         return result
 
     def _extract_pages(self, pdf_path: str) -> List[Dict[str, Any]]:
@@ -61,37 +66,16 @@ class PDFProcessor:
             print(f"  [OK] Text extraction completed")
             return pages_data
 
-    def _find_table_of_contents(self, pages_data: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Find table of contents in first 5 pages"""
-        print("  [INFO] Looking for table of contents in first 5 pages...")
-
-        # Search in first 5 pages only
-        for page_info in pages_data[:5]:
-            text = page_info['text'].lower()
-            page_num = page_info['page_number']
-
-            # Common TOC indicators
-            toc_keywords = ['목차', 'contents', 'table of contents', '차례']
-
-            if any(keyword in text for keyword in toc_keywords):
-                print(f"  [OK] Table of contents found on page {page_num}")
-                return {
-                    "found": True,
-                    "page_number": page_num,
-                    "text": page_info['text']
-                }
-
-        print("  [WARNING] Table of contents not found")
-        return {"found": False}
-
 def main():
     """Test runner"""
     import sys
     if len(sys.argv) < 2:
-        print("Usage: python module0_pdf_processing.py <pdf_path>")
+        print("Usage: python step1_pdf_processing.py <pdf_path> [version_id]")
         sys.exit(1)
 
-    PDFProcessor().process_pdf(sys.argv[1])
+    pdf_path = sys.argv[1]
+    version_id = sys.argv[2] if len(sys.argv) >= 3 else None
+    PDFProcessor().process_pdf(pdf_path, version_id=version_id)
 
 
 if __name__ == "__main__":

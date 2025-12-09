@@ -1,4 +1,4 @@
-description: "추상 공격 흐름과 환경 정보를 결합하여 구체적인 공격 플로우 생성"
+description: "Combine abstract attack flow with environment details to generate concrete attack flow"
 
 prompt: |
   You are a penetration testing expert creating executable attack plans.
@@ -15,30 +15,25 @@ prompt: |
 
   Map each abstract goal to concrete attack steps using the specific environment details.
 
-  ## Core Principles
+  ## Core Principles (concise, mandatory)
 
-  1. **Use Actual Environment Details**
-     - Extract all specific values from the environment description (IPs, URLs, credentials, file names, methods, parameters)
-     - Every detail mentioned must be captured in the output
+  1) Every node MUST include `environment_specific.commands`
+     - Single-line executable PowerShell/command
+     - Chain multiple actions in one line with `;`
+     - No code blocks/backticks/comments; plain command string only
+     - If a real command is impossible, add a simulation stub (e.g., echo); never leave it empty
 
-  2. **Create Executable Steps**
-     - Each node must contain enough information to actually execute the attack
-     - Include all parameters, paths, and configurations needed
+  2) Enforce environment detail usage
+     - Reflect IP/URL/credentials/params/filenames/methods from the environment in the command when applicable
+     - No external downloads/URLs unless explicitly provided
 
-  3. **Preserve Information**
-     - Don't lose or simplify any environment-specific details
-     - If the environment says "POST with userid and password parameters", include exactly that
+  3) Payload/tool priority
+     - Priority 1: files explicitly provided in environment/Caldera payloads (already in agent working dir)
+     - Priority 2: built-in OS tools (PowerShell/cmd)
+     - Priority 3: simulation command if neither is possible
 
-  4. **Tool Selection Priority**
-     - **1st Priority**: Use tools/payloads explicitly provided in environment description (Caldera payloads, uploaded files)
-     - **2nd Priority**: Use native OS built-in tools (PowerShell, cmd.exe, netstat, systeminfo, etc.)
-     - **3rd Priority**: Use simulation/stub commands when actual tools unavailable (e.g., keylogger simulation with echo commands)
-
-  5. **Caldera Payload Handling**
-     - If environment mentions files in "## Caldera Payload" section, these are ALREADY available to the agent
-     - Reference payload files by name only (e.g., "cmd.asp", "PrintSpoofer64.exe")
-     - DO NOT include download URLs or methods - Caldera handles file delivery automatically
-     - Just describe what to do with the file once it's available (e.g., "copy cmd.asp to uploads folder")
+  4) Preserve information
+     - Do not drop or simplify environment-specified values (e.g., POST parameter names, credentials, exact URLs)
 
   ## Output Structure
 
@@ -59,7 +54,7 @@ prompt: |
           username: "actual username"
           password: "actual password"
         payload: "actual filename"
-        commands: "PowerShell command in single line"  # IMPORTANT: Generate executable command here
+        commands: "PowerShell command in single line"  # required for every node; single-line command
         # Include ANY other details mentioned
 
   edges:
@@ -74,7 +69,7 @@ prompt: |
 
   ## Examples
 
-  **Example 1: Using provided payload**
+  **Example 1: Using provided payload (commands included)**
 
   Environment says: "Caldera payloads: cmd.asp, deploy.ps1. Login at http://192.168.56.105/login_process.asp using POST with userid/password parameters. Credentials: admin/P@ssw0rd!2020"
 
@@ -92,6 +87,7 @@ prompt: |
       credentials:
         username: "admin"
         password: "P@ssw0rd!2020"
+      commands: "Invoke-WebRequest -Uri 'http://192.168.56.105/login_process.asp' -Method POST -Body @{{userid='admin';password='P@ssw0rd!2020'}} -UseBasicParsing"
 
   - id: "node_002"
     name: "Upload Web Shell"
@@ -99,9 +95,13 @@ prompt: |
     description: "Deploy cmd.asp web shell using Caldera payload"
     environment_specific:
       payload: "cmd.asp"  # Caldera automatically downloads to agent working directory
+      url: "http://192.168.56.105/upload_handler.asp"
+      method: "POST"
+      form_field: "file"
+      commands: "Invoke-WebRequest -Uri 'http://192.168.56.105/upload_handler.asp' -Method POST -InFile .\\cmd.asp -ContentType 'multipart/form-data' -UseBasicParsing"
   ```
 
-  **Example 2: Using native OS tools**
+  **Example 2: Using native OS tools (commands included)**
 
   Abstract goal: "Compress collected data for exfiltration"
   No compression tool in environment description.
@@ -117,7 +117,7 @@ prompt: |
       tool: "PowerShell Compress-Archive"  # 2nd priority: native tool
   ```
 
-  **Example 3: Using simulation/stub**
+  **Example 3: Using simulation/stub (commands included)**
 
   Abstract goal: "Deploy keylogger for credential harvesting"
   No keylogger in environment description.
@@ -133,9 +133,9 @@ prompt: |
       simulation: true  # 3rd priority: stub simulation
   ```
 
-  **Example 4: Privilege escalation via web shell**
+  **Example 4: Privilege escalation via web shell (commands included)**
 
-  Environment says: "SeImpersonatePrivilege 권한이 있는 iis 서버 웹쉘을 이용해서 실행. Web shell at http://192.168.56.105/uploads/cmd.asp. PrintSpoofer64.exe and deploy.ps1 already copied to C:\\inetpub\\wwwroot\\uploads\\"
+  Environment says: "Use IIS web shell with SeImpersonatePrivilege. Web shell at http://192.168.56.105/uploads/cmd.asp. PrintSpoofer64.exe and deploy.ps1 already copied to C:\\inetpub\\wwwroot\\uploads\\"
 
   Correct node:
   ```yaml

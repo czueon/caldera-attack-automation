@@ -8,7 +8,14 @@ import yaml
 import os
 from typing import Dict, List
 import sys
-sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+from pathlib import Path
+from datetime import datetime
+
+# 모듈 패키지를 정상 인식하도록 프로젝트 루트를 sys.path에 추가
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
 from modules.ai.factory import get_llm_client
 from modules.prompts.manager import PromptManager
 
@@ -19,7 +26,7 @@ class AbstractFlowExtractor:
         self.prompt_manager = PromptManager()
         self.chunk_size = 8000  # 청크 크기 (characters)
 
-    def extract_abstract_flow(self, input_file: str, output_file: str):
+    def extract_abstract_flow(self, input_file: str, output_file: str = None, version_id: str = None):
         """Extract abstract attack flow from KISA report (PDF parsed data)
 
         2-stage process:
@@ -30,6 +37,22 @@ class AbstractFlowExtractor:
 
         with open(input_file, 'r', encoding='utf-8') as f:
             step1_data = yaml.safe_load(f)
+
+        metadata = step1_data.get('metadata', {})
+        # pdf_name, version_id 우선 추출 (경로 → 메타데이터 → 기본값)
+        pdf_name = metadata.get('pdf_name')
+        if not pdf_name:
+            pdf_name = Path(input_file).stem.replace("_parsed", "")
+            # 경로 규칙상 data/processed/{pdf}/{version}/{file} 구조면 상위 폴더에서 가져옴
+            if Path(input_file).parents:
+                pdf_name = Path(input_file).parent.parent.name or pdf_name
+
+        derived_version = (
+            version_id
+            or metadata.get('version_id')
+            or Path(input_file).parent.name  # data/processed/{pdf}/{version}/
+        )
+        version_id = derived_version or datetime.now().strftime("%Y%m%d_%H%M%S")
 
         # Extract pages text from step1
         pages = step1_data.get('pages', [])
@@ -54,17 +77,25 @@ class AbstractFlowExtractor:
         output_data = {
             'metadata': {
                 'source': input_file,
+                'pdf_name': pdf_name,
+                'version_id': version_id,
                 'step': 2,
                 'description': 'Environment-independent abstract attack flow'
             },
             'abstract_flow': abstract_flow
         }
 
+        # output_file 미지정 시 data/processed/{pdf}/{version}/{pdf}_step2.yml 사용
+        if output_file is None:
+            output_file = Path("../../data/processed") / pdf_name / version_id / f"{pdf_name}_step2.yml"
+
         os.makedirs(os.path.dirname(output_file), exist_ok=True)
         with open(output_file, 'w', encoding='utf-8') as f:
             yaml.dump(output_data, f, allow_unicode=True, sort_keys=False)
 
         print(f"[SUCCESS] Abstract flow extraction completed -> {output_file}")
+        print(f"  - PDF: {pdf_name}")
+        print(f"  - Version: {version_id}")
         self._print_summary(abstract_flow)
 
     def _extract_overview(self, full_text: str) -> str:
@@ -220,11 +251,15 @@ class AbstractFlowExtractor:
 
 def main():
     """Test runner"""
-    if len(sys.argv) < 3:
-        print("Usage: python module2_abstract_flow.py <input_yml> <output_yml>")
+    if len(sys.argv) < 2:
+        print("Usage: python step2_abstract_flow.py <input_yml> [output_yml] [version_id]")
         sys.exit(1)
 
-    AbstractFlowExtractor().extract_abstract_flow(sys.argv[1], sys.argv[2])
+    input_file = sys.argv[1]
+    output_file = sys.argv[2] if len(sys.argv) >= 3 else None
+    version_id = sys.argv[3] if len(sys.argv) >= 4 else None
+
+    AbstractFlowExtractor().extract_abstract_flow(input_file, output_file, version_id)
 
 
 if __name__ == "__main__":

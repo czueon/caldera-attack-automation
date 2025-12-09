@@ -398,7 +398,7 @@ class AbilityGenerator:
         print(f"  - Adversary Profile: {adversaries[0]['name']} ({len(adversaries[0]['atomic_ordering'])}개 ability)")
 
         if self.failed_nodes:
-            print(f"\n⚠️  생성 실패 노드: {len(self.failed_nodes)}개")
+            print(f"\n[WARNING] 생성 실패 노드: {len(self.failed_nodes)}개")
             for failed in self.failed_nodes:
                 print(f"  - [{failed['id']}] {failed['name']}: {failed['reason']}")
 
@@ -424,7 +424,7 @@ def main():
     """Main entry point"""
     import sys
     if len(sys.argv) < 3:
-        print("Usage: python module4_ability_generator.py <step3.yml> <output_dir>")
+        print("Usage: python step4_ability_generator.py <step3.yml> <output_dir>")
         sys.exit(1)
 
     generator = AbilityGenerator()

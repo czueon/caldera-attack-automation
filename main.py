@@ -240,6 +240,44 @@ def main():
         print("\n[Step 5] Caldera 자동화 (업로드 → 실행 → Self-Correcting)")
         print("-" * 70)
 
+        # VM 재부팅
+        print("\n[5-0] VM 재부팅")
+        print("-" * 70)
+        try:
+            # scripts 디렉토리를 Python path에 추가
+            scripts_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'scripts')
+            if scripts_dir not in sys.path:
+                sys.path.insert(0, scripts_dir)
+
+            import vm_reload
+            controller = vm_reload.VBoxController()
+
+            vm_name = os.getenv('VBOX_VM_NAME')
+            snapshot_name = os.getenv('VBOX_SNAPSHOT_NAME')
+            vm_name_lateral = os.getenv('VBOX_VM_NAME_lateral')
+            snapshot_name_lateral = os.getenv('VBOX_SNAPSHOT_NAME_lateral')
+
+            # Main VM 복원 및 시작
+            if vm_name and snapshot_name:
+                print(f"  {vm_name} 스냅샷 복원 및 시작 중...")
+                controller.restore_and_start(vm_name, snapshot_name)
+                print(f"  [OK] {vm_name} 재부팅 완료")
+
+            # Lateral Movement VM 복원 및 시작
+            if vm_name_lateral and snapshot_name_lateral:
+                print(f"  {vm_name_lateral} 스냅샷 복원 및 시작 중...")
+                controller.restore_and_start(vm_name_lateral, snapshot_name_lateral)
+                print(f"  [OK] {vm_name_lateral} 재부팅 완료")
+
+            # VM 부팅 대기
+            print("  VM 부팅 대기 중 (30초)...")
+            time.sleep(30)
+            print("  [OK] 모든 VM 재부팅 완료")
+
+        except Exception as e:
+            print(f"  [WARNING] VM 재부팅 실패: {str(e)}")
+            print("  계속 진행합니다...")
+
         abilities_file = caldera_output_dir / "abilities.yml"
         adversaries_file = caldera_output_dir / "adversaries.yml"
 
@@ -291,7 +329,7 @@ def main():
             else:
                 print("  대상 Agent: 모든 연결된 에이전트")
 
-            operation_name = args.operation_name or f"Auto-Operation-{timestamp}"
+            operation_name = args.operation_name or f"Auto-Operation-{version_id}"
 
             executor = CalderaExecutor(get_caldera_url(), get_caldera_api_key())
 
@@ -371,6 +409,44 @@ def main():
             uploader = CalderaUploader()
             uploader.upload_abilities(str(abilities_file))
             print("  [OK] 재업로드 완료")
+
+            # VM 재부팅 (재실행 전)
+            print("\n  VM 재부팅 (재실행 전)")
+            print("  " + "-" * 66)
+            try:
+                # scripts 디렉토리를 Python path에 추가
+                scripts_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'scripts')
+                if scripts_dir not in sys.path:
+                    sys.path.insert(0, scripts_dir)
+
+                import vm_reload
+                controller = vm_reload.VBoxController()
+
+                vm_name = os.getenv('VBOX_VM_NAME')
+                snapshot_name = os.getenv('VBOX_SNAPSHOT_NAME')
+                vm_name_lateral = os.getenv('VBOX_VM_NAME_lateral')
+                snapshot_name_lateral = os.getenv('VBOX_SNAPSHOT_NAME_lateral')
+
+                # Main VM 복원 및 시작
+                if vm_name and snapshot_name:
+                    print(f"    {vm_name} 스냅샷 복원 및 시작 중...")
+                    controller.restore_and_start(vm_name, snapshot_name)
+                    print(f"    [OK] {vm_name} 재부팅 완료")
+
+                # Lateral Movement VM 복원 및 시작
+                if vm_name_lateral and snapshot_name_lateral:
+                    print(f"    {vm_name_lateral} 스냅샷 복원 및 시작 중...")
+                    controller.restore_and_start(vm_name_lateral, snapshot_name_lateral)
+                    print(f"    [OK] {vm_name_lateral} 재부팅 완료")
+
+                # VM 부팅 대기
+                print("    VM 부팅 대기 중 (30초)...")
+                time.sleep(30)
+                print("    [OK] 모든 VM 재부팅 완료")
+
+            except Exception as e:
+                print(f"    [WARNING] VM 재부팅 실패: {str(e)}")
+                print("    계속 진행합니다...")
 
             if not args.skip_execution:
                 # 새로운 Operation 생성 및 실행

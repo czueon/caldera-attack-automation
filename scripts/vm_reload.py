@@ -158,42 +158,43 @@ def main():
     try:
         # 환경변수에서 자동으로 연결 설정 로드
         controller = VBoxController()
-        
+
         print("=== VM 목록 ===")
         print(controller.list_vms())
-        
+
         print("\n=== 실행 중인 VM ===")
         print(controller.list_running_vms())
-        
+
         # 환경변수에서 VM 이름 가져오기
         vm_name = os.getenv('VBOX_VM_NAME')
         snapshot_name = os.getenv('VBOX_SNAPSHOT_NAME')
-        
-        print(f"\n=== {vm_name} 정보 ===")
-        print(f"상태: {controller.get_state(vm_name)}")
-        
-        print(f"\n=== {vm_name} 스냅샷 목록 ===")
-        print(controller.list_snapshots(vm_name))
-        
-        # 제어 예시 (주석 처리됨)
-        # VM 시작
-        # controller.start_vm(vm_name)
-        
-        # VM 종료 (안전하게)
-        # controller.stop_vm(vm_name, force=False)
-        
-        # VM 강제 종료
-        # controller.stop_vm(vm_name, force=True)
-        
-        # 스냅샷 복원만
-        # controller.restore_snapshot(vm_name, snapshot_name)
-        
-        # 스냅샷 복원 후 시작
-        controller.restore_and_start(vm_name, snapshot_name)
-        
-        # 새 스냅샷 생성
-        # controller.create_snapshot(vm_name, "new_snapshot", "테스트 스냅샷")
-        
+        vm_name_lateral = os.getenv('VBOX_VM_NAME_lateral')
+        snapshot_name_lateral = os.getenv('VBOX_SNAPSHOT_NAME_lateral')
+
+        # Main VM 복원 및 시작
+        if vm_name and snapshot_name:
+            print(f"\n=== {vm_name} 정보 ===")
+            print(f"상태: {controller.get_state(vm_name)}")
+
+            print(f"\n=== {vm_name} 스냅샷 목록 ===")
+            print(controller.list_snapshots(vm_name))
+
+            print(f"\n=== {vm_name} 스냅샷 복원 및 시작 ===")
+            controller.restore_and_start(vm_name, snapshot_name)
+
+        # Lateral Movement VM 복원 및 시작
+        if vm_name_lateral and snapshot_name_lateral:
+            print(f"\n=== {vm_name_lateral} 정보 ===")
+            print(f"상태: {controller.get_state(vm_name_lateral)}")
+
+            print(f"\n=== {vm_name_lateral} 스냅샷 목록 ===")
+            print(controller.list_snapshots(vm_name_lateral))
+
+            print(f"\n=== {vm_name_lateral} 스냅샷 복원 및 시작 ===")
+            controller.restore_and_start(vm_name_lateral, snapshot_name_lateral)
+
+        print("\n=== 모든 VM 재부팅 완료 ===")
+
     except Exception as e:
         print(f"Error: {str(e)}")
 

@@ -86,13 +86,13 @@ class CalderaReporter:
             resp.raise_for_status()
             operation = resp.json()
 
-            print(f"✓ Operation: {operation.get('name')}")
+            print(f"[OK] Operation: {operation.get('name')}")
             print(f"  ID: {operation_id}")
             print(f"  State: {operation.get('state')}")
             print(f"  Total links: {len(operation.get('chain', []))}\n")
 
         except Exception as e:
-            print(f"✗ Error fetching operation: {e}")
+            print(f"[ERROR] Error fetching operation: {e}")
             return None
 
         # 2. 각 link의 result 수집
@@ -246,12 +246,34 @@ class CalderaReporter:
         return agents
 
     def _calculate_stats(self, results: List[Dict]) -> Dict:
-        """통계 계산."""
-        total = len(results)
-        completed = sum(1 for r in results if r.get('finish_time'))
-        success = sum(1 for r in results if r['status'] == 0)
-        failed = completed - success if completed > 0 else 0
+        """통계 계산 (ability 단위로 집계 - 여러 agent에서 실행된 경우 하나라도 성공하면 성공)."""
+        # Ability 단위로 그룹화
+        ability_results = {}
+        for r in results:
+            ability_id = r.get('ability_id')
+            if not ability_id:
+                continue
 
+            if ability_id not in ability_results:
+                ability_results[ability_id] = {
+                    'ability_name': r.get('ability_name'),
+                    'statuses': [],
+                    'completed': []
+                }
+
+            ability_results[ability_id]['statuses'].append(r.get('status'))
+            ability_results[ability_id]['completed'].append(bool(r.get('finish_time')))
+
+        # Ability별 성공 여부 판단 (하나라도 성공하면 성공)
+        total_abilities = len(ability_results)
+        successful_abilities = sum(1 for ab in ability_results.values()
+                                   if 0 in ab['statuses'])  # 하나라도 status=0 이면 성공
+        completed_abilities = sum(1 for ab in ability_results.values()
+                                  if any(ab['completed']))
+        failed_abilities = completed_abilities - successful_abilities
+
+        # Link 레벨 통계 (참고용)
+        total_links = len(results)
         with_stdout = sum(1 for r in results if r.get('stdout') and r['stdout'] != '')
         with_stderr = sum(1 for r in results if r.get('stderr') and r['stderr'] != '')
         with_any_output = sum(1 for r in results
@@ -259,11 +281,12 @@ class CalderaReporter:
                               or (r.get('stderr') and r['stderr'] != ''))
 
         return {
-            'total_abilities': total,
-            'completed': completed,
-            'success': success,
-            'failed': failed,
-            'success_rate': round(success / completed * 100, 2) if completed > 0 else 0,
+            'total_abilities': total_abilities,
+            'completed': completed_abilities,
+            'success': successful_abilities,
+            'failed': failed_abilities,
+            'success_rate': round(successful_abilities / completed_abilities * 100, 2) if completed_abilities > 0 else 0,
+            'total_links': total_links,  # 참고: 실제 실행된 link 수
             'with_stdout': with_stdout,
             'with_stderr': with_stderr,
             'with_any_output': with_any_output,

@@ -3,7 +3,6 @@ __pycache__/
 *.py[cod]
 *.pyc
 *.pyo
-__init__.py
 
 # Virtual Environment
 venv/

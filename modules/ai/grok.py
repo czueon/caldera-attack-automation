@@ -37,12 +37,26 @@ class GrokClient(LLMClient):
 
         messages.append({"role": "user", "content": prompt})
 
-        response = self.client.chat.completions.create(
-            model=self.model,
-            messages=messages,
-            max_tokens=max_tokens,
-            temperature=0.7
-        )
+        # Grok 모델도 OpenAI SDK를 사용하므로 최신 API 규격 적용
+        # grok-beta, grok-2 등 최신 모델은 max_completion_tokens 사용 가능성 고려
+        try:
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                max_tokens=max_tokens,
+                temperature=0.7
+            )
+        except Exception as e:
+            # max_tokens 오류 시 max_completion_tokens로 재시도
+            if 'max_tokens' in str(e) and 'max_completion_tokens' in str(e):
+                response = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=messages,
+                    max_completion_tokens=max_tokens,
+                    temperature=0.7
+                )
+            else:
+                raise
 
         # 메트릭 추적
         tracker = get_metrics_tracker()

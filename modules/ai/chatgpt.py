@@ -30,19 +30,56 @@ class ChatGPTClient(LLMClient):
         # OpenAI API는 max_tokens를 4096으로 제한
         max_tokens = min(max_tokens, 4096)
 
+        # o1 모델은 system prompt를 지원하지 않음
+        is_reasoning_model = self.model.startswith('o1')
+
         messages = []
 
-        if system_prompt:
-            messages.append({"role": "system", "content": system_prompt})
+        if is_reasoning_model:
+            # o1 모델: system prompt를 user 메시지에 통합
+            if system_prompt:
+                combined_prompt = f"{system_prompt}\n\n{prompt}"
+                messages.append({"role": "user", "content": combined_prompt})
+            else:
+                messages.append({"role": "user", "content": prompt})
+        else:
+            # 일반 모델: system prompt 지원
+            if system_prompt:
+                messages.append({"role": "system", "content": system_prompt})
+            messages.append({"role": "user", "content": prompt})
 
-        messages.append({"role": "user", "content": prompt})
-
-        response = self.client.chat.completions.create(
-            model=self.model,
-            messages=messages,
-            max_tokens=max_tokens,
-            temperature=0.7
+        # 최신 모델은 max_completion_tokens 사용, 구 모델은 max_tokens 사용
+        # - max_completion_tokens: o1, gpt-4o, gpt-5 시리즈 등
+        # - max_tokens: gpt-3.5-turbo, gpt-4, gpt-4-turbo 등
+        use_completion_tokens = (
+            self.model.startswith('o1') or
+            self.model.startswith('gpt-4o') or
+            self.model.startswith('gpt-5')
         )
+
+        if use_completion_tokens:
+            if is_reasoning_model:
+                # o1 모델: temperature 제외
+                response = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=messages,
+                    max_completion_tokens=max_tokens
+                )
+            else:
+                # gpt-4o, gpt-5 등: temperature 포함
+                response = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=messages,
+                    max_completion_tokens=max_tokens,
+                    temperature=0.7
+                )
+        else:
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                max_tokens=max_tokens,
+                temperature=0.7
+            )
 
         # 메트릭 추적
         tracker = get_metrics_tracker()

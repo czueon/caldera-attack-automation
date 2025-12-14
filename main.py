@@ -479,8 +479,8 @@ def main():
                 print("[INFO] Operation 실행 후 리포트를 저장하고 다시 실행하세요.")
                 sys.exit(1)
 
-        # 5-4. Self-Correcting
-        print("\n[5-4] Self-Correcting (실패한 Ability 수정)")
+        # 5-4. Self-Correcting (최대 3회 재시도)
+        print("\n[5-4] Self-Correcting (실패한 Ability 수정 - 최대 3회 재시도)")
         print("-" * 70)
 
         # 첫 번째 실행 통계 저장 (Self-Correcting 전 초기 리포트 확보)
@@ -493,20 +493,48 @@ def main():
         first_success = first_stats.get('success', 0)
         first_failed = first_stats.get('failed', 0)
 
-        corrector = OfflineCorrector()
-        correction_report = corrector.run(
-            abilities_file=str(abilities_file),
-            operation_report_file=str(operation_report_file),
-            env_description_file=args.env,
-            output_dir=str(caldera_output_dir)
-        )
+        print(f"\n[초기 실행 결과] 전체: {first_total}, 성공: {first_success}, 실패: {first_failed}")
 
-        # 수정된 ability 개수 확인
-        corrected_count = correction_report.get('summary', {}).get('corrected', 0)
+        # 재시도 루프 변수 초기화
+        MAX_RETRIES = 3
+        retry_count = 0
+        all_retry_stats = []  # 각 재시도의 통계 저장
+        termination_reason = None
+        current_report_file = operation_report_file
 
-        if corrected_count > 0:
-            print(f"\n[5-5] 수정된 Ability 재업로드 및 재실행")
+        # 재시도 루프
+        while retry_count < MAX_RETRIES:
+            print(f"\n[재시도 {retry_count + 1}/{MAX_RETRIES}] Self-Correcting 시작")
             print("-" * 70)
+
+            # Self-Correcting 실행
+            corrector = OfflineCorrector()
+            correction_report = corrector.run(
+                abilities_file=str(abilities_file),
+                operation_report_file=str(current_report_file),
+                env_description_file=args.env,
+                output_dir=str(caldera_output_dir)
+            )
+
+            # 수정된 ability 개수 확인
+            corrected_count = correction_report.get('summary', {}).get('corrected', 0)
+            total_failed = correction_report.get('summary', {}).get('total_failed', 0)
+
+            print(f"  수정 가능한 실패: {corrected_count}/{total_failed}")
+
+            # 종료 조건 체크
+            if corrected_count == 0:
+                if total_failed == 0:
+                    termination_reason = "all_success"
+                    print(f"  [종료] 모든 Ability가 성공했습니다.")
+                else:
+                    termination_reason = "no_recoverable_failures"
+                    print(f"  [종료] 수정 가능한 실패가 없습니다 (복구 불가능: {total_failed}개).")
+                break
+
+            # 수정된 abilities 재업로드 및 재실행
+            print(f"\n  수정된 Ability 재업로드 및 재실행 (재시도 {retry_count + 1})")
+            print("  " + "-" * 66)
 
             # 수정된 abilities 재업로드
             print("  수정된 abilities 재업로드 중...")
@@ -514,13 +542,12 @@ def main():
             uploader.upload_abilities(str(abilities_file))
             print("  [OK] 재업로드 완료")
 
-            print("\n[5-pre] Caldera agent 정리")
-            print("-" * 70)
+            print("  " + "-" * 66)
             try:
                 caldera_kill_all_agents()
             except Exception as e:
-                print(f"[WARNING] agent 정리 실패: {e}")
-                print("계속 진행합니다...")
+                print(f"  [WARNING] agent 정리 실패: {e}")
+                print("  계속 진행합니다...")
 
             # VM 재부팅 (재실행 전)
             print("\n  VM 재부팅 (재실행 전)")
@@ -563,8 +590,9 @@ def main():
 
             if not args.skip_execution:
                 # 새로운 Operation 생성 및 실행
-                operation_name_retry = f"{operation_name}-Retry"
-                print(f"  새 Operation 생성 중: {operation_name_retry}")
+                operation_name_retry = f"{operation_name}-Retry-{retry_count + 1}"
+                print(f"\n  Operation 생성 및 실행 (재시도 {retry_count + 1})")
+                print(f"  Operation 이름: {operation_name_retry}")
 
                 executor = CalderaExecutor(get_caldera_url(), get_caldera_api_key())
                 op_id_retry = executor.create_operation(operation_name_retry, uploaded_adversary_id, args.agent_paw)
@@ -586,7 +614,7 @@ def main():
 
                 if retry_report:
                     # 재실행 리포트 저장 (Path 사용 후 문자열 변환)
-                    retry_report_file = caldera_output_dir / "operation_report_retry.json"
+                    retry_report_file = caldera_output_dir / f"operation_report_retry_{retry_count + 1}.json"
                     reporter.save_report(retry_report, str(retry_report_file))
                     print(f"  [OK] 재실행 리포트 저장: {retry_report_file}")
 
@@ -596,34 +624,75 @@ def main():
                     retry_success = retry_stats.get('success', 0)
                     retry_failed = retry_stats.get('failed', 0)
 
-                    # 성공률 비교 출력
-                    print("\n" + "="*70)
-                    print("성공률 비교")
-                    print("="*70)
-                    print(f"{'구분':<20} {'전체':<10} {'성공':<10} {'실패':<10} {'성공률':<10}")
-                    print("-"*70)
+                    # 통계 저장
+                    all_retry_stats.append({
+                        'retry_number': retry_count + 1,
+                        'total': retry_total,
+                        'success': retry_success,
+                        'failed': retry_failed,
+                        'success_rate': (retry_success / retry_total * 100) if retry_total > 0 else 0
+                    })
 
-                    first_rate = (first_success / first_total * 100) if first_total > 0 else 0
-                    retry_rate = (retry_success / retry_total * 100) if retry_total > 0 else 0
+                    print(f"  [재시도 {retry_count + 1} 결과] 전체: {retry_total}, 성공: {retry_success}, 실패: {retry_failed}")
 
-                    print(f"{'첫 번째 실행':<20} {first_total:<10} {first_success:<10} {first_failed:<10} {first_rate:.1f}%")
-                    print(f"{'재실행 (수정 후)':<20} {retry_total:<10} {retry_success:<10} {retry_failed:<10} {retry_rate:.1f}%")
-
-                    improvement = retry_rate - first_rate
-                    if improvement > 0:
-                        print(f"\n✓ 성공률 개선: +{improvement:.1f}% ({first_success} → {retry_success} 성공)")
-                    elif improvement < 0:
-                        print(f"\n✗ 성공률 감소: {improvement:.1f}%")
-                    else:
-                        print(f"\n- 성공률 동일")
-                    print("="*70)
+                    # 다음 루프를 위해 현재 리포트 파일 업데이트
+                    current_report_file = retry_report_file
+                    retry_count += 1
                 else:
                     print("  [WARNING] 재실행 결과 수집 실패")
+                    break
             else:
                 print("  [INFO] --skip-execution 옵션으로 자동 재실행을 건너뜁니다.")
                 print("  [INFO] 수동으로 재실행 후 결과를 확인하세요.")
+                break
+
+        # 최대 재시도 도달 확인
+        if retry_count >= MAX_RETRIES and termination_reason is None:
+            termination_reason = "max_retries_reached"
+            print(f"\n  [종료] 최대 재시도 횟수({MAX_RETRIES}회)에 도달했습니다.")
+
+        # 최종 성공률 비교 출력
+        print("\n" + "="*70)
+        print("Self-Correcting 최종 결과")
+        print("="*70)
+
+        first_rate = (first_success / first_total * 100) if first_total > 0 else 0
+
+        if all_retry_stats:
+            # 재시도가 있었던 경우
+            print(f"{'구분':<25} {'전체':<10} {'성공':<10} {'실패':<10} {'성공률':<10}")
+            print("-"*70)
+            print(f"{'초기 실행':<25} {first_total:<10} {first_success:<10} {first_failed:<10} {first_rate:.1f}%")
+
+            for stat in all_retry_stats:
+                retry_label = f"재시도 {stat['retry_number']}"
+                print(f"{retry_label:<25} {stat['total']:<10} {stat['success']:<10} {stat['failed']:<10} {stat['success_rate']:.1f}%")
+
+            # 최종 개선도 계산
+            final_rate = all_retry_stats[-1]['success_rate']
+            improvement = final_rate - first_rate
+            final_success = all_retry_stats[-1]['success']
+
+            print("-"*70)
+            if improvement > 0:
+                print(f"최종 개선: +{improvement:.1f}% ({first_success} → {final_success} 성공)")
+            elif improvement < 0:
+                print(f"최종 변화: {improvement:.1f}%")
+            else:
+                print(f"최종 변화: 동일")
+            print(f"최종 성공률: {final_rate:.1f}% ({final_success}/{first_total} 성공)")
+            print(f"재시도 횟수: {retry_count}회")
         else:
-            print("\n[INFO] 수정된 Ability가 없어 재실행을 건너뜁니다.")
+            # 재시도가 없었던 경우 (초기 실행 결과가 최종 결과)
+            print(f"{'구분':<25} {'전체':<10} {'성공':<10} {'실패':<10} {'성공률':<10}")
+            print("-"*70)
+            print(f"{'초기 실행 (최종)':<25} {first_total:<10} {first_success:<10} {first_failed:<10} {first_rate:.1f}%")
+            print("-"*70)
+            print(f"최종 성공률: {first_rate:.1f}% ({first_success}/{first_total} 성공)")
+            print(f"재시도: 없음 (수정 가능한 실패 없음)")
+
+        print(f"종료 사유: {termination_reason}")
+        print("="*70)
 
         print("\n[OK] Step 5 완료!")
         tracker.end_step(success=True)

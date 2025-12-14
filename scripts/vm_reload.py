@@ -152,6 +152,58 @@ class VBoxController:
         print(f"Deleting snapshot: {snapshot_name}")
         return self._ssh_command(f'VBoxManage snapshot "{vm_name}" delete "{snapshot_name}"')
 
+    def restore_and_boot_all(self, wait_callback=None):
+        """환경변수에서 VM 설정을 읽어 모든 VM 복원 및 부팅"""
+        vm_name = os.getenv('VBOX_VM_NAME')
+        snapshot_name = os.getenv('VBOX_SNAPSHOT_NAME')
+        vm_name_lateral = os.getenv('VBOX_VM_NAME_lateral')
+        snapshot_name_lateral = os.getenv('VBOX_SNAPSHOT_NAME_lateral')
+
+        # Main VM 복원 및 시작
+        if vm_name and snapshot_name:
+            print(f"  {vm_name} 스냅샷 복원 및 시작 중...")
+            self.restore_and_start(vm_name, snapshot_name)
+            print(f"  [OK] {vm_name} 재부팅 완료")
+
+        # Lateral Movement VM 복원 및 시작
+        if vm_name_lateral and snapshot_name_lateral:
+            print(f"  {vm_name_lateral} 스냅샷 복원 및 시작 중...")
+            self.restore_and_start(vm_name_lateral, snapshot_name_lateral)
+            print(f"  [OK] {vm_name_lateral} 재부팅 완료")
+
+        # VM 부팅 대기
+        print("  VM 부팅 대기 중 (30초)...")
+        time.sleep(30)
+        print("  [OK] 모든 VM 재부팅 완료")
+
+        # 콜백 함수 실행 (예: Caldera agent 대기)
+        if wait_callback:
+            wait_callback()
+
+    def shutdown_all(self):
+        """환경변수에서 VM 설정을 읽어 모든 VM 종료"""
+        vm_name = os.getenv('VBOX_VM_NAME')
+        if vm_name:
+            try:
+                state = self.get_state(vm_name)
+                if state == "running":
+                    print(f"[VM 종료] {vm_name} 종료 중...")
+                    self.stop_vm(vm_name, force=True)
+                    print(f"[OK] {vm_name} 종료 완료")
+            except Exception as e:
+                print(f"[WARNING] {vm_name} 종료 실패: {e}")
+
+        vm_name_lateral = os.getenv('VBOX_VM_NAME_lateral')
+        if vm_name_lateral:
+            try:
+                state = self.get_state(vm_name_lateral)
+                if state == "running":
+                    print(f"[VM 종료] {vm_name_lateral} 종료 중...")
+                    self.stop_vm(vm_name_lateral, force=True)
+                    print(f"[OK] {vm_name_lateral} 종료 완료")
+            except Exception as e:
+                print(f"[WARNING] {vm_name_lateral} 종료 실패: {e}")
+
 
 def main():
     """메인 함수 - 사용 예시"""

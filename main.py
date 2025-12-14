@@ -6,13 +6,11 @@ KISA TTPs → Caldera Adversary Pipeline
 - 일반 모드: --step 1~5 또는 범위 지정 (예: 1~3)
 """
 
-import os
 import argparse
 import sys
 import json
 from pathlib import Path
 from datetime import datetime
-import requests
 
 # 모듈 임포트
 from modules.steps.step1_pdf_processing import PDFProcessor
@@ -23,11 +21,12 @@ from modules.steps.step5_self_correcting import OfflineCorrector
 from modules.caldera.uploader import CalderaUploader
 from modules.caldera.executor import CalderaExecutor
 from modules.caldera.reporter import CalderaReporter
+from modules.caldera.agent_manager import AgentManager
 from modules.core.config import get_caldera_url, get_caldera_api_key, get_llm_provider
 from modules.core.metrics import init_metrics, get_metrics_tracker
 from modules.ai.factory import get_llm_client
+from scripts import vm_reload
 import yaml
-import time
 
 
 def parse_step_range(step_arg):
@@ -62,53 +61,6 @@ def parse_step_range(step_arg):
         except ValueError:
             raise ValueError(f"Invalid step: {step_arg}")
 
-def _caldera_headers():
-    return {"KEY": get_caldera_api_key(), "Content-Type": "application/json"}
-
-def caldera_get_agents(timeout=10):
-    url = get_caldera_url().rstrip("/") + "/api/v2/agents"
-    r = requests.get(url, headers=_caldera_headers(), timeout=timeout)
-    r.raise_for_status()
-    return r.json()
-
-def caldera_kill_all_agents():
-    agents = caldera_get_agents()
-    if not agents:
-        print("[INFO] 삭제할 agent 없음")
-        return 0
-
-    print(f"[INFO] 삭제 대상 agent 수: {len(agents)}")
-    base = get_caldera_url().rstrip("/")
-
-    for a in agents:
-        paw = a.get("paw")
-        del_url = f"{base}/api/v2/agents/{paw}"
-        resp = requests.delete(del_url, headers=_caldera_headers(), timeout=10)
-        print(f"[KILL] agent {paw} → HTTP {resp.status_code}")
-
-    print("[OK] 모든 agent 삭제 완료")
-    return len(agents)
-
-def caldera_wait_for_exactly_one_agent(timeout=180, interval=5):
-    print("\n[WAIT] agent가 정확히 1개 연결될 때까지 대기 중...")
-    print(f"       (timeout={timeout}s, interval={interval}s)")
-    start = time.time()
-
-    while True:
-        agents = caldera_get_agents()
-        count = len(agents)
-        print(f"[STATUS] 현재 agent 수: {count}")
-
-        if count == 1:
-            a = agents[0]
-            print("\n[OK] agent 1개 확인됨")
-            print(f"     PAW={a.get('paw')}, host={a.get('host')}, platform={a.get('platform')}")
-            return a
-
-        if time.time() - start > timeout:
-            raise TimeoutError("agent가 1개로 수렴하지 않음 (timeout)")
-
-        time.sleep(interval)
 
 def main():
     parser = argparse.ArgumentParser(
@@ -335,10 +287,13 @@ def main():
         print("\n[Step 5] Caldera 자동화 (업로드 → 실행 → Self-Correcting)")
         print("-" * 70)
 
+        # Agent Manager 초기화
+        agent_manager = AgentManager()
+
         print("\n[5-pre] Caldera agent 정리")
         print("-" * 70)
         try:
-            caldera_kill_all_agents()
+            agent_manager.kill_all_agents()
         except Exception as e:
             print(f"[WARNING] agent 정리 실패: {e}")
             print("계속 진행합니다...")
@@ -347,37 +302,8 @@ def main():
         print("\n[5-0] VM 재부팅")
         print("-" * 70)
         try:
-            # scripts 디렉토리를 Python path에 추가
-            scripts_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'scripts')
-            if scripts_dir not in sys.path:
-                sys.path.insert(0, scripts_dir)
-
-            import vm_reload
             controller = vm_reload.VBoxController()
-
-            vm_name = os.getenv('VBOX_VM_NAME')
-            snapshot_name = os.getenv('VBOX_SNAPSHOT_NAME')
-            vm_name_lateral = os.getenv('VBOX_VM_NAME_lateral')
-            snapshot_name_lateral = os.getenv('VBOX_SNAPSHOT_NAME_lateral')
-
-            # Main VM 복원 및 시작
-            if vm_name and snapshot_name:
-                print(f"  {vm_name} 스냅샷 복원 및 시작 중...")
-                controller.restore_and_start(vm_name, snapshot_name)
-                print(f"  [OK] {vm_name} 재부팅 완료")
-
-            # Lateral Movement VM 복원 및 시작
-            if vm_name_lateral and snapshot_name_lateral:
-                print(f"  {vm_name_lateral} 스냅샷 복원 및 시작 중...")
-                controller.restore_and_start(vm_name_lateral, snapshot_name_lateral)
-                print(f"  [OK] {vm_name_lateral} 재부팅 완료")
-
-            # VM 부팅 대기
-            print("  VM 부팅 대기 중 (30초)...")
-            time.sleep(30)
-            print("  [OK] 모든 VM 재부팅 완료")
-            caldera_wait_for_exactly_one_agent()
-
+            controller.restore_and_boot_all(wait_callback=agent_manager.wait_for_exactly_one_agent)
         except Exception as e:
             print(f"  [WARNING] VM 재부팅 실패: {str(e)}")
             print("  계속 진행합니다...")
@@ -579,7 +505,7 @@ def main():
 
             print("  " + "-" * 66)
             try:
-                caldera_kill_all_agents()
+                agent_manager.kill_all_agents()
             except Exception as e:
                 print(f"  [WARNING] agent 정리 실패: {e}")
                 print("  계속 진행합니다...")
@@ -588,37 +514,8 @@ def main():
             print("\n  VM 재부팅 (재실행 전)")
             print("  " + "-" * 66)
             try:
-                # scripts 디렉토리를 Python path에 추가
-                scripts_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'scripts')
-                if scripts_dir not in sys.path:
-                    sys.path.insert(0, scripts_dir)
-
-                import vm_reload
                 controller = vm_reload.VBoxController()
-
-                vm_name = os.getenv('VBOX_VM_NAME')
-                snapshot_name = os.getenv('VBOX_SNAPSHOT_NAME')
-                vm_name_lateral = os.getenv('VBOX_VM_NAME_lateral')
-                snapshot_name_lateral = os.getenv('VBOX_SNAPSHOT_NAME_lateral')
-
-                # Main VM 복원 및 시작
-                if vm_name and snapshot_name:
-                    print(f"    {vm_name} 스냅샷 복원 및 시작 중...")
-                    controller.restore_and_start(vm_name, snapshot_name)
-                    print(f"    [OK] {vm_name} 재부팅 완료")
-
-                # Lateral Movement VM 복원 및 시작
-                if vm_name_lateral and snapshot_name_lateral:
-                    print(f"    {vm_name_lateral} 스냅샷 복원 및 시작 중...")
-                    controller.restore_and_start(vm_name_lateral, snapshot_name_lateral)
-                    print(f"    [OK] {vm_name_lateral} 재부팅 완료")
-
-                # VM 부팅 대기
-                print("    VM 부팅 대기 중 (30초)...")
-                time.sleep(30)
-                print("    [OK] 모든 VM 재부팅 완료")
-                caldera_wait_for_exactly_one_agent()
-
+                controller.restore_and_boot_all(wait_callback=agent_manager.wait_for_exactly_one_agent)
             except Exception as e:
                 print(f"    [WARNING] VM 재부팅 실패: {str(e)}")
                 print("    계속 진행합니다...")
@@ -816,6 +713,21 @@ def main():
     print(f"\n메트릭 저장: {metrics_file}")
     print("="*70)
 
+    # 모든 절차 완료 후 VM 종료
+    print("\n" + "="*70)
+    print("[VM 종료] 실행 중인 VM을 종료합니다...")
+    print("="*70)
+
+    try:
+        controller = vm_reload.VBoxController()
+        controller.shutdown_all()
+        print("\n[OK] 모든 VM 종료 완료")
+        print("="*70)
+    except Exception as e:
+        print(f"\n[WARNING] VM 종료 중 오류 발생: {e}")
+        print("VM을 수동으로 종료해주세요.")
+        print("="*70)
+
 
 if __name__ == "__main__":
     try:
@@ -830,6 +742,15 @@ if __name__ == "__main__":
                 print("\n[메트릭] 중단 시점까지의 메트릭을 저장합니다...")
             except:
                 pass
+
+        # VM 종료 시도
+        try:
+            print("\n[VM 종료] 중단 시 VM을 종료합니다...")
+            controller = vm_reload.VBoxController()
+            controller.shutdown_all()
+        except:
+            pass
+
         sys.exit(1)
     except Exception as e:
         print(f"\n\n[ERROR] 오류 발생: {e}")
@@ -843,4 +764,13 @@ if __name__ == "__main__":
                 print("\n[메트릭] 실패 시점까지의 메트릭을 저장합니다...")
             except:
                 pass
+
+        # VM 종료 시도
+        try:
+            print("\n[VM 종료] 에러 발생 시 VM을 종료합니다...")
+            controller = vm_reload.VBoxController()
+            controller.shutdown_all()
+        except:
+            pass
+
         sys.exit(1)

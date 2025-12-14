@@ -502,6 +502,23 @@ def main():
         termination_reason = None
         current_report_file = operation_report_file
 
+        # 누적 correction_report 초기화
+        cumulative_correction_report = {
+            "initial_execution": {
+                "total": first_total,
+                "success": first_success,
+                "failed": first_failed,
+                "success_rate": (first_success / first_total * 100) if first_total > 0 else 0
+            },
+            "retry_attempts": [],
+            "correction_history": {},
+            "termination_reason": None,
+            "final_result": None
+        }
+
+        # correction_report.json 파일 경로
+        cumulative_report_path = caldera_output_dir / "correction_report.json"
+
         # 재시도 루프
         while retry_count < MAX_RETRIES:
             print(f"\n[재시도 {retry_count + 1}/{MAX_RETRIES}] Self-Correcting 시작")
@@ -513,7 +530,8 @@ def main():
                 abilities_file=str(abilities_file),
                 operation_report_file=str(current_report_file),
                 env_description_file=args.env,
-                output_dir=str(caldera_output_dir)
+                output_dir=str(caldera_output_dir),
+                correction_history=cumulative_correction_report['correction_history']
             )
 
             # 수정된 ability 개수 확인
@@ -521,6 +539,14 @@ def main():
             total_failed = correction_report.get('summary', {}).get('total_failed', 0)
 
             print(f"  수정 가능한 실패: {corrected_count}/{total_failed}")
+
+            # 현재 재시도 정보를 누적 리포트에 추가
+            current_retry_data = {
+                "retry_number": retry_count + 1,
+                "corrections": correction_report.get('corrections', []),
+                "summary": correction_report.get('summary', {}),
+                "execution_result": None  # 재실행 후 업데이트됨
+            }
 
             # 종료 조건 체크
             if corrected_count == 0:
@@ -530,6 +556,15 @@ def main():
                 else:
                     termination_reason = "no_recoverable_failures"
                     print(f"  [종료] 수정 가능한 실패가 없습니다 (복구 불가능: {total_failed}개).")
+
+                # 종료 시에도 현재 재시도 정보를 누적 리포트에 추가
+                cumulative_correction_report['retry_attempts'].append(current_retry_data)
+
+                # 중간 저장
+                with open(cumulative_report_path, 'w', encoding='utf-8') as f:
+                    json.dump(cumulative_correction_report, f, indent=2, ensure_ascii=False)
+                print(f"  [OK] correction_report 중간 저장: {cumulative_report_path}")
+
                 break
 
             # 수정된 abilities 재업로드 및 재실행
@@ -635,6 +670,38 @@ def main():
 
                     print(f"  [재시도 {retry_count + 1} 결과] 전체: {retry_total}, 성공: {retry_success}, 실패: {retry_failed}")
 
+                    # 현재 재시도 데이터에 실행 결과 추가
+                    current_retry_data['execution_result'] = {
+                        'total': retry_total,
+                        'success': retry_success,
+                        'failed': retry_failed,
+                        'success_rate': (retry_success / retry_total * 100) if retry_total > 0 else 0
+                    }
+
+                    # 누적 리포트에 현재 재시도 추가
+                    cumulative_correction_report['retry_attempts'].append(current_retry_data)
+
+                    # 실패한 ability들을 correction_history에 추가
+                    failed_abilities_data = retry_report.get('failed_abilities', [])
+                    for failed_ability in failed_abilities_data:
+                        ability_id = failed_ability.get('ability_id')
+                        if ability_id:
+                            # 이력에 추가
+                            if ability_id not in cumulative_correction_report['correction_history']:
+                                cumulative_correction_report['correction_history'][ability_id] = []
+
+                            cumulative_correction_report['correction_history'][ability_id].append({
+                                'attempt': retry_count + 1,
+                                'command': failed_ability.get('command', 'N/A'),
+                                'failure_type': failed_ability.get('status', 'Unknown'),
+                                'error': failed_ability.get('stderr', '') or failed_ability.get('stdout', '')
+                            })
+
+                    # 누적 correction_report.json 저장
+                    with open(cumulative_report_path, 'w', encoding='utf-8') as f:
+                        json.dump(cumulative_correction_report, f, indent=2, ensure_ascii=False)
+                    print(f"  [OK] 누적 correction_report 업데이트: {cumulative_report_path}")
+
                     # 다음 루프를 위해 현재 리포트 파일 업데이트
                     current_report_file = retry_report_file
                     retry_count += 1
@@ -693,6 +760,31 @@ def main():
 
         print(f"종료 사유: {termination_reason}")
         print("="*70)
+
+        # 최종 결과를 누적 리포트에 저장
+        if all_retry_stats:
+            final_stats = all_retry_stats[-1]
+            cumulative_correction_report['final_result'] = {
+                'total': final_stats['total'],
+                'success': final_stats['success'],
+                'failed': final_stats['failed'],
+                'success_rate': final_stats['success_rate']
+            }
+        else:
+            # 재시도 없음 - 초기 결과가 최종 결과
+            cumulative_correction_report['final_result'] = {
+                'total': first_total,
+                'success': first_success,
+                'failed': first_failed,
+                'success_rate': (first_success / first_total * 100) if first_total > 0 else 0
+            }
+
+        cumulative_correction_report['termination_reason'] = termination_reason
+
+        # 최종 누적 correction_report.json 저장
+        with open(cumulative_report_path, 'w', encoding='utf-8') as f:
+            json.dump(cumulative_correction_report, f, indent=2, ensure_ascii=False)
+        print(f"\n[저장] 최종 correction_report.json: {cumulative_report_path}")
 
         print("\n[OK] Step 5 완료!")
         tracker.end_step(success=True)

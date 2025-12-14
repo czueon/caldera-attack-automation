@@ -137,15 +137,19 @@ class AbilityFixer:
         self,
         failed: FailedAbility,
         original_ability: Dict,
-        env_description: str
+        env_description: str,
+        correction_history: Optional[list] = None
     ) -> Tuple[str, bool]:
         """
         실패한 Ability를 LLM으로 수정
 
+        Args:
+            correction_history: 이전 수정 시도 이력
+
         Returns:
             Tuple[str, bool]: (수정된 명령어, 성공 여부)
         """
-        prompt = self._build_prompt(failed, original_ability, env_description)
+        prompt = self._build_prompt(failed, original_ability, env_description, correction_history)
 
         try:
             response_text = self.llm.generate_text(prompt=prompt, max_tokens=2000)
@@ -162,7 +166,8 @@ class AbilityFixer:
         self,
         failed: FailedAbility,
         original_ability: Dict,
-        env_description: str
+        env_description: str,
+        correction_history: Optional[list] = None
     ) -> str:
         """LLM 프롬프트 구성"""
 
@@ -171,6 +176,15 @@ class AbilityFixer:
 
         stderr_preview = failed.stderr[:1000] if failed.stderr else "(없음)"
         stdout_preview = failed.stdout[:1000] if failed.stdout else "(없음)"
+
+        # correction_history 포맷팅
+        history_text = ""
+        if correction_history:
+            history_text = "\n[Previous Correction Attempts]\n"
+            for h in correction_history:
+                history_text += f"- Attempt {h.get('attempt', 'N/A')}: {h.get('failure_type', 'Unknown')}\n"
+                history_text += f"  Command: {h.get('command', 'N/A')[:100]}...\n"
+                history_text += f"  Error: {h.get('error', 'N/A')[:200]}...\n\n"
 
         return self.prompt_manager.render(
             "step5_fix_ability.yaml",
@@ -185,7 +199,8 @@ class AbilityFixer:
             stdout=stdout_preview,
             failure_type=failed.failure_type.value,
             strategy=strategy,
-            env_description=env_description
+            env_description=env_description,
+            correction_history=history_text
         )
 
     def _extract_command(self, text: str) -> str:
@@ -249,7 +264,8 @@ class OfflineCorrector:
         abilities_file: str,
         operation_report_file: str,
         env_description_file: str,
-        output_dir: Optional[str] = None
+        output_dir: Optional[str] = None,
+        correction_history: Optional[Dict] = None
     ) -> Dict:
         """
         Self-Correcting 실행
@@ -259,6 +275,7 @@ class OfflineCorrector:
             operation_report_file: Operation Report JSON 파일 경로
             env_description_file: 환경 설명 파일 경로
             output_dir: 출력 디렉토리 (None이면 원본 abilities.yml 위치에 저장)
+            correction_history: 이전 수정 이력 (ability_id별 실패 이력)
 
         Returns:
             수정 결과 리포트
@@ -266,6 +283,10 @@ class OfflineCorrector:
         print("=" * 70)
         print("Module 5: Offline Self-Correcting Engine")
         print("=" * 70)
+
+        # correction_history 초기화
+        if correction_history is None:
+            correction_history = {}
 
         # 1. 데이터 로드
         abilities = self._load_yaml(abilities_file)
@@ -302,6 +323,13 @@ class OfflineCorrector:
         for failed in failed_abilities:
             print(f"\n  [{failed.ability_name}]")
 
+            # 이전 수정 이력 확인
+            history = correction_history.get(failed.ability_id, [])
+            if history:
+                print(f"    [이력] 이전 수정 시도 {len(history)}회")
+                for h in history:
+                    print(f"      - 시도 {h.get('attempt', 'N/A')}: {h.get('failure_type', 'Unknown')}")
+
             # 4-1. 실패 유형 분류
             failed.failure_type = self.classifier.classify(failed.stderr, failed.stdout)
             print(f"    실패 유형: {failed.failure_type.value}")
@@ -326,9 +354,9 @@ class OfflineCorrector:
                 print(f"    [경고] 원본 ability를 찾을 수 없음")
                 continue
 
-            # 4-4. LLM으로 수정
+            # 4-4. LLM으로 수정 (이력 정보 전달)
             print(f"    LLM 수정 중...")
-            fixed_cmd, success = self.fixer.fix_ability(failed, original, env_description)
+            fixed_cmd, success = self.fixer.fix_ability(failed, original, env_description, history)
 
             if success and fixed_cmd:
                 # abilities 리스트에서 해당 ability의 command 직접 수정

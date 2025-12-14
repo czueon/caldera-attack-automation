@@ -57,37 +57,3 @@ class AgentManager:
 
         print("[OK] 모든 agent 삭제 완료")
         return len(agents)
-
-    def wait_for_exactly_one_agent(self, timeout=180, interval=5):
-        """
-        에이전트가 정확히 1개 연결될 때까지 대기.
-
-        Args:
-            timeout: 최대 대기 시간(초).
-            interval: 폴링 간격(초).
-
-        Returns:
-            dict: 연결된 에이전트 정보.
-
-        Raises:
-            TimeoutError: 타임아웃 시간 내에 에이전트가 1개로 수렴하지 않음.
-        """
-        print("\n[WAIT] agent가 정확히 1개 연결될 때까지 대기 중...")
-        print(f"       (timeout={timeout}s, interval={interval}s)")
-        start = time.time()
-
-        while True:
-            agents = self.get_agents()
-            count = len(agents)
-            print(f"[STATUS] 현재 agent 수: {count}")
-
-            if count == 1:
-                a = agents[0]
-                print("\n[OK] agent 1개 확인됨")
-                print(f"     PAW={a.get('paw')}, host={a.get('host')}, platform={a.get('platform')}")
-                return a
-
-            if time.time() - start > timeout:
-                raise TimeoutError("agent가 1개로 수렴하지 않음 (timeout)")
-
-            time.sleep(interval)

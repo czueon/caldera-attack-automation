@@ -303,7 +303,7 @@ def main():
         print("-" * 70)
         try:
             controller = vm_reload.VBoxController()
-            controller.restore_and_boot_all(wait_callback=agent_manager.wait_for_exactly_one_agent)
+            controller.restore_and_boot_all()
         except Exception as e:
             print(f"  [WARNING] VM 재부팅 실패: {str(e)}")
             print("  계속 진행합니다...")
@@ -515,7 +515,7 @@ def main():
             print("  " + "-" * 66)
             try:
                 controller = vm_reload.VBoxController()
-                controller.restore_and_boot_all(wait_callback=agent_manager.wait_for_exactly_one_agent)
+                controller.restore_and_boot_all()
             except Exception as e:
                 print(f"    [WARNING] VM 재부팅 실패: {str(e)}")
                 print("    계속 진행합니다...")

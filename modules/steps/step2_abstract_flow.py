@@ -241,10 +241,12 @@ class AbstractFlowExtractor:
                 print(f"  {i}. [{goal.get('tactic', 'unknown')}] {goal.get('goal', 'Unknown')}")
 
         if 'mitre_tactics' in flow:
-            print(f"\nMITRE Tactics: {', '.join(flow['mitre_tactics'])}")
+            tactics = [t for t in flow['mitre_tactics'] if t is not None]
+            print(f"\nMITRE Tactics: {', '.join(tactics)}")
 
         if 'required_capabilities' in flow:
-            print(f"\nRequired Capabilities: {', '.join(flow['required_capabilities'])}")
+            capabilities = [c for c in flow['required_capabilities'] if c is not None]
+            print(f"\nRequired Capabilities: {', '.join(capabilities)}")
 
         print("="*70)
 

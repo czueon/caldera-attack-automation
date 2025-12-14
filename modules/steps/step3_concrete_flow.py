@@ -151,6 +151,9 @@ class ConcreteFlowGenerator:
                 if not yaml_text or len(yaml_text.strip()) < 10:
                     raise ValueError("Extracted YAML is empty or too short")
 
+                # Windows 경로의 백슬래시 이스케이프 문제 수정
+                yaml_text = self._fix_backslashes(yaml_text)
+
                 flow = yaml.safe_load(yaml_text)
 
                 # 기본 구조 검증
@@ -365,6 +368,31 @@ class ConcreteFlowGenerator:
         elif '```' in text:
             return text.split('```')[1].split('```')[0].strip()
         return text
+
+    def _fix_backslashes(self, yaml_text: str) -> str:
+        """
+        YAML에서 Windows 경로의 백슬래시 이스케이프 문제 수정
+        큰따옴표 안의 백슬래시를 올바르게 이스케이프
+        """
+        import re
+        
+        # 큰따옴표로 둘러싸인 문자열 찾기
+        def fix_quoted_string(match):
+            content = match.group(1)
+            
+            # 먼저 모든 연속된 백슬래시를 단일 백슬래시로 정규화
+            # \\\ -> \, \\ -> \, \ -> \
+            normalized = re.sub(r'\\+', r'\\', content)
+            
+            # 그 다음 모든 백슬래시를 이중 백슬래시로 변환
+            fixed = normalized.replace('\\', '\\\\')
+            
+            return f'"{fixed}"'
+        
+        # 큰따옴표로 감싸진 모든 문자열에 대해 백슬래시 수정
+        fixed_yaml = re.sub(r'"([^"]*)"', fix_quoted_string, yaml_text)
+        return fixed_yaml
+        return fixed_yaml
 
     def _print_summary(self, flow: Dict):
         """Print flow summary"""

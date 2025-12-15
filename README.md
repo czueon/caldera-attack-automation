@@ -8,8 +8,12 @@ KISA 위협 인텔리전스 보고서(PDF)를 자동으로 분석하여 MITRE Ca
 - **AI 기반 분석**: Claude Sonnet 4.5를 활용한 지능형 TTP 추출 및 명령어 생성
 - **MITRE ATT&CK 통합**: mitreattack-python 기반 자동 Technique 매핑
 - **환경 맞춤형**: 특정 환경 설정에 맞춘 구체적 PowerShell 명령어 생성
-- **Self-Correcting**: 실패한 Ability를 AI가 자동 분석 및 수정 후 재실행
-- **성공률 비교**: 초기 실행 대비 수정 후 성공률 개선 현황 자동 출력
+- **Self-Correcting**: 실패한 Ability를 AI가 자동 분석 및 수정 후 재실행 (최대 3회)
+  - 누적 수정 이력을 활용한 지능형 재시도
+  - 실패 원인 분류 및 맞춤형 수정 전략
+- **VM 자동 관리**: 재시도마다 VM 스냅샷 복원으로 깨끗한 환경 보장
+- **성공률 추적**: 초기 실행 대비 수정 후 성공률 개선 현황 자동 출력
+- **메트릭 추적**: LLM 토큰 사용량, 비용, 실행 시간 자동 기록
 
 ## 시스템 아키텍처
 
@@ -63,7 +67,7 @@ KISA 위협 인텔리전스 보고서(PDF)를 자동으로 분석하여 MITRE Ca
 ### 1. Python 환경 설정
 
 ```bash
-# Python 3.8+ 필요
+# Python 3.10.11 필요
 python -m venv venv
 source venv/bin/activate  # Windows: venv\Scripts\activate
 ```
@@ -87,6 +91,18 @@ CLAUDE_MODEL=claude-sonnet-4-20250514
 # Caldera 설정
 CALDERA_URL=http://your-caldera-server:8888
 CALDERA_API_KEY=your_caldera_api_key_here
+
+# VM 관리 설정 (선택사항 - Step 5 자동 재부팅용)
+VBOX_VM_NAME=YourVMName
+VBOX_SNAPSHOT_NAME=CleanSnapshot
+VBOX_VM_NAME_lateral=LateralVMName  # Lateral movement VM (있는 경우)
+VBOX_SNAPSHOT_NAME_lateral=LateralCleanSnapshot
+
+# SSH 설정 (VirtualBox 원격 제어용 - 선택사항)
+VBOX_SSH_HOST=your-vbox-host
+VBOX_SSH_PORT=22
+VBOX_SSH_USER=your-username
+VBOX_SSH_PASSWORD=your-password
 ```
 
 ## 사용 방법
@@ -199,25 +215,45 @@ data/processed/20251209_025808/
 ├── step3_concrete_flow.yml             # 구체적 공격 흐름
 ├── step4_abilities.yml                 # Ability 중간 결과
 └── caldera/
-    ├── abilities.yml                   # Caldera Abilities (Self-Correcting 수정됨)
-    ├── adversaries.yml                 # Caldera Adversary Profile
-    ├── operation_report.json           # 초기 실행 결과
-    ├── operation_report_retry.json     # 재실행 결과
-    └── correction_report.json          # Self-Correcting 상세 리포트
+    ├── abilities.yml                       # Caldera Abilities (Self-Correcting 수정됨)
+    ├── adversaries.yml                     # Caldera Adversary Profile
+    ├── operation_report.json               # 초기 실행 결과
+    ├── operation_report_retry_1.json       # 재시도 1 결과
+    ├── operation_report_retry_2.json       # 재시도 2 결과
+    ├── operation_report_retry_3.json       # 재시도 3 결과 (최대 3회)
+    ├── correction_report.json              # 누적 Self-Correcting 리포트
+    └── experiment_metrics.json             # 실험 메트릭 (토큰, 비용, 시간)
 ```
 
 ### 성공률 비교 출력 예시
 
 ```
 ======================================================================
-성공률 비교
+Self-Correcting 최종 결과
 ======================================================================
-구분                   전체        성공        실패        성공률
+구분                      전체        성공        실패        성공률
 ----------------------------------------------------------------------
-첫 번째 실행           37          24          13          64.9%
-재실행 (수정 후)       37          31          6           83.8%
+초기 실행                 34          18          16          52.9%
+재시도 1                  34          26          8           76.5%
+재시도 2                  34          28          6           82.4%
+재시도 3                  34          30          4           88.2%
+----------------------------------------------------------------------
+최종 개선: +35.3% (18 → 30 성공)
+최종 성공률: 88.2% (30/34 성공)
+재시도 횟수: 3회
+종료 사유: max_retries_reached
+======================================================================
 
-성공률 개선: +18.9% (24 → 31 성공)
+[실험 메트릭 요약]
+----------------------------------------------------------------------
+총 실행 시간: 45분 32초
+LLM 제공자: claude
+LLM 모델: claude-sonnet-4-20250514
+총 입력 토큰: 234,567
+총 출력 토큰: 45,123
+총 토큰: 279,690
+예상 비용: $8.3940
+완료된 Step: 5/5
 ======================================================================
 ```
 
@@ -235,15 +271,18 @@ data/processed/20251209_025808/
 │   ├── ai/
 │   │   ├── base.py                    # LLM 베이스 클래스
 │   │   ├── claude.py                  # Claude API 클라이언트
+│   │   ├── chatgpt.py                 # OpenAI API 클라이언트
 │   │   └── factory.py                 # LLM 팩토리 (환경변수 기반)
 │   ├── caldera/
+│   │   ├── agent_manager.py           # Caldera Agent 관리 (조회/삭제/대기)
 │   │   ├── uploader.py                # Caldera 업로드
 │   │   ├── executor.py                # Operation 실행 및 제어
 │   │   ├── reporter.py                # 결과 수집
 │   │   └── deleter.py                 # 리소스 삭제
 │   ├── core/
 │   │   ├── config.py                  # 환경 변수 로드
-│   │   └── models.py                  # 데이터 모델
+│   │   ├── models.py                  # 데이터 모델
+│   │   └── metrics.py                 # 실험 메트릭 추적 (토큰, 비용, 시간)
 │   ├── prompts/
 │   │   ├── manager.py                 # 프롬프트 템플릿 관리
 │   │   └── templates/                 # YAML 프롬프트 템플릿
@@ -264,6 +303,10 @@ data/processed/20251209_025808/
 │   ├── raw/                           # 원본 PDF
 │   └── processed/                     # 처리 결과 (타임스탬프별)
 └── scripts/
+    ├── vm_reload.py                   # VM 스냅샷 복원 및 관리
+    ├── analyze_metrics.py             # 메트릭 분석 유틸리티
+    ├── analyze_report.py              # Operation 리포트 분석
+    ├── get_operation_report.py        # Caldera에서 리포트 다운로드
     ├── upload_to_caldera.py           # Caldera 업로드 유틸리티
     └── delete_from_caldera.py         # Caldera 삭제 유틸리티
 ```
@@ -288,21 +331,54 @@ Step 5의 Self-Correcting 엔진은 실패한 Ability를 자동으로 분석하�
 - 변수 의존성 제거 (self-contained 명령어로 변환)
 - 권한 상승 없는 대체 방법 사용
 
-### 자동 재실행
+### 누적 컨텍스트 활용
 
-수정된 Ability를 자동으로 재업로드하고 새 Operation을 실행하여 개선 효과를 즉시 확인할 수 있습니다.
+재시도마다 이전 실패 이력을 LLM에 제공하여 더 나은 수정안 생성:
+- 각 Ability별 수정 이력 추적
+- 이전 시도의 명령어, 실패 원인, 에러 메시지 누적
+- `correction_report.json`에 전체 수정 과정 기록
+
+### 자동 재실행 (최대 3회)
+
+각 재시도마다:
+1. 실패한 Ability 분석 및 수정
+2. 수정된 Ability 재업로드
+3. **VM 스냅샷 복원** (깨끗한 환경 보장)
+4. Caldera Agent 정리 및 재연결 대기
+5. 새 Operation 실행
+6. 결과 수집 및 성공률 비교
+
+종료 조건:
+- 모든 Ability 성공 (`all_success`)
+- 수정 가능한 실패 없음 (`no_recoverable_failures`)
+- 최대 재시도 횟수 도달 (`max_retries_reached`)
 
 ## 유틸리티 스크립트
 
-### 재실행 결과 수집
-
-타임아웃 등으로 재실행 결과를 놓친 경우:
+### VM 관리
 
 ```bash
-python collect_retry_results.py 20251209_025808
+# VM 스냅샷 복원 및 시작
+python -m scripts.vm_reload
+
+# 환경변수 설정 필요:
+# VBOX_VM_NAME, VBOX_SNAPSHOT_NAME
+# VBOX_SSH_HOST, VBOX_SSH_USER, VBOX_SSH_PASSWORD
 ```
 
-Caldera에서 재실행 Operation을 찾아 결과를 수집하고 성공률을 비교합니다.
+### 메트릭 분석
+
+```bash
+# 실험 메트릭 분석 (토큰 사용량, 비용 등)
+python scripts/analyze_metrics.py data/processed/[experiment_id]/experiment_metrics.json
+```
+
+### Operation 리포트 분석
+
+```bash
+# Operation 결과 상세 분석
+python scripts/analyze_report.py data/processed/[experiment_id]/caldera/operation_report.json
+```
 
 ### Caldera 리소스 삭제
 
@@ -404,6 +480,7 @@ Operation 완료를 기다릴 때 시간 제한이 없습니다. 완료될 때�
 - **Windows 전용**: 현재 Windows/PowerShell 명령어만 지원
 - **PowerShell 5.1**: PowerShell 5.1 호환 명령어만 생성
 - **환경 의존성**: 정확한 환경 설명 파일 필수
+- **VirtualBox SSH**: VM 자동 관리를 위해 VirtualBox 호스트에 SSH 접근 필요 (선택사항)
 
 ## 참고 자료
 

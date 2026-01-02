@@ -158,6 +158,14 @@ class VBoxController:
         snapshot_name = os.getenv('VBOX_SNAPSHOT_NAME')
         vm_name_lateral = os.getenv('VBOX_VM_NAME_lateral')
         snapshot_name_lateral = os.getenv('VBOX_SNAPSHOT_NAME_lateral')
+        vm_name_ad = os.getenv('VBOX_VM_NAME_ad')
+        snapshot_name_ad = os.getenv('VBOX_SNAPSHOT_NAME_ad')
+
+        # AD VM 복원 및 시작
+        if vm_name_ad and snapshot_name_ad:
+            print(f"  {vm_name_ad} 스냅샷 복원 및 시작 중...")
+            self.restore_and_start(vm_name_ad, snapshot_name_ad)
+            print(f"  [OK] {vm_name_ad} 재부팅 완료")
 
         # Main VM 복원 및 시작
         if vm_name and snapshot_name:
@@ -203,6 +211,17 @@ class VBoxController:
                     print(f"[OK] {vm_name_lateral} 종료 완료")
             except Exception as e:
                 print(f"[WARNING] {vm_name_lateral} 종료 실패: {e}")
+
+        vm_name_ad = os.getenv('VBOX_VM_NAME_ad')
+        if vm_name_ad:
+            try:
+                state = self.get_state(vm_name_ad)
+                if state == "running":
+                    print(f"[VM 종료] {vm_name_ad} 종료 중...")
+                    self.stop_vm(vm_name_ad, force=True)
+                    print(f"[OK] {vm_name_ad} 종료 완료")
+            except Exception as e:
+                print(f"[WARNING] {vm_name_ad} 종료 실패: {e}")
 
 
 def main():

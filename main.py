@@ -308,6 +308,19 @@ def main():
             print(f"  [WARNING] VM 재부팅 실패: {str(e)}")
             print("  계속 진행합니다...")
 
+        # 에이전트 대기
+        print("\n[5-0-1] Caldera 에이전트 대기")
+        print("-" * 70)
+        try:
+            agent_manager.wait_for_agents(expected_count=1, timeout=300, check_interval=5)
+        except TimeoutError as e:
+            print(f"  [ERROR] {e}")
+            print("  에이전트가 생성되지 않았습니다. VM 및 에이전트 설정을 확인하세요.")
+            sys.exit(1)
+        except Exception as e:
+            print(f"  [WARNING] 에이전트 대기 실패: {e}")
+            print("  계속 진행합니다...")
+
         abilities_file = caldera_output_dir / "abilities.yml"
         adversaries_file = caldera_output_dir / "adversaries.yml"
 
@@ -518,6 +531,19 @@ def main():
                 controller.restore_and_boot_all()
             except Exception as e:
                 print(f"    [WARNING] VM 재부팅 실패: {str(e)}")
+                print("    계속 진행합니다...")
+
+            # 에이전트 대기 (재실행 전)
+            print("\n  Caldera 에이전트 대기 (재실행 전)")
+            print("  " + "-" * 66)
+            try:
+                agent_manager.wait_for_agents(expected_count=1, timeout=300, check_interval=5)
+            except TimeoutError as e:
+                print(f"    [ERROR] {e}")
+                print("    에이전트가 생성되지 않았습니다. VM 및 에이전트 설정을 확인하세요.")
+                break
+            except Exception as e:
+                print(f"    [WARNING] 에이전트 대기 실패: {e}")
                 print("    계속 진행합니다...")
 
             if not args.skip_execution:

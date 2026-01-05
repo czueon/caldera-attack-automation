@@ -105,15 +105,34 @@ python main.py --step all --pdf "data/raw/KISA_TTPs_5.pdf" --env "environment_tt
 ```env
 VBOX_VM_NAME=ttps6
 VBOX_SNAPSHOT_NAME=ttps6
-# VBOX_VM_NAME_lateral=ttps5_2
-# VBOX_SNAPSHOT_NAME_lateral=ttps5_2
-# VBOX_VM_NAME_ad=ttps5_ad
-# VBOX_SNAPSHOT_NAME_ad=ttps5_ad
+# VBOX_VM_NAME_lateral=
+# VBOX_SNAPSHOT_NAME_lateral=
+# VBOX_VM_NAME_ad=
+# VBOX_SNAPSHOT_NAME_ad=
 ```
 
 ### 전체 파이프라인 실행 명령어
 ```bash
 python main.py --step all --pdf "data/raw/KISA_TTPs_6.pdf" --env "environment_ttps6.md"
+```
+
+---
+
+## TTPs 9
+
+### .env 수정 사항
+```env
+VBOX_VM_NAME=ttps9
+VBOX_SNAPSHOT_NAME=ttps9
+# VBOX_VM_NAME_lateral=
+# VBOX_SNAPSHOT_NAME_lateral=
+# VBOX_VM_NAME_ad=
+# VBOX_SNAPSHOT_NAME_ad=
+```
+
+### 전체 파이프라인 실행 명령어
+```bash
+python main.py --step all --pdf "data/raw/KISA_TTPs_9.pdf" --env "environment_ttps9.md"
 ```
 
 ---

@@ -280,6 +280,32 @@ def main():
             tracker.end_step(success=False, error_message=str(e))
             raise
 
+        # Step 4 완료 후 Step 5가 예정되어 있다면 VM 재부팅을 미리 시작
+        if 5 in steps:
+            print("\n[최적화] Step 5 준비: VM 재부팅 시작 (백그라운드)")
+            print("-" * 70)
+            agent_manager = AgentManager()
+            controller = vm_reload.VBoxController()
+
+            # VM 종료
+            try:
+                controller.shutdown_all()
+            except Exception as e:
+                print(f"[WARNING] VM 종료 실패: {e}")
+
+            # Caldera agent 정리
+            try:
+                agent_manager.kill_all_agents()
+            except Exception as e:
+                print(f"[WARNING] agent 정리 실패: {e}")
+
+            # VM 재부팅 시작
+            try:
+                controller.restore_and_boot_all()
+                print("  [OK] VM 재부팅 시작됨")
+            except Exception as e:
+                print(f"  [WARNING] VM 재부팅 실패: {str(e)}")
+
     # Step 5: Caldera Automation (Upload → Execute → Self-Correct)
     if 5 in steps:
         tracker.start_step("Step 5: Caldera Automation")
@@ -287,34 +313,40 @@ def main():
         print("\n[Step 5] Caldera 자동화 (업로드 → 실행 → Self-Correcting)")
         print("-" * 70)
 
-        # Agent Manager 및 VM Controller 초기화
-        agent_manager = AgentManager()
-        controller = vm_reload.VBoxController()
+        # Step 4에서 이미 초기화했는지 확인
+        if 4 not in steps:
+            # Agent Manager 및 VM Controller 초기화
+            agent_manager = AgentManager()
+            controller = vm_reload.VBoxController()
 
-        print("\n[5-pre-1] VM 종료")
-        print("-" * 70)
-        try:
-            controller.shutdown_all()
-        except Exception as e:
-            print(f"[WARNING] VM 종료 실패: {e}")
-            print("계속 진행합니다...")
+            print("\n[5-pre-1] VM 종료")
+            print("-" * 70)
+            try:
+                controller.shutdown_all()
+            except Exception as e:
+                print(f"[WARNING] VM 종료 실패: {e}")
+                print("계속 진행합니다...")
 
-        print("\n[5-pre-2] Caldera agent 정리")
-        print("-" * 70)
-        try:
-            agent_manager.kill_all_agents()
-        except Exception as e:
-            print(f"[WARNING] agent 정리 실패: {e}")
-            print("계속 진행합니다...")
+            print("\n[5-pre-2] Caldera agent 정리")
+            print("-" * 70)
+            try:
+                agent_manager.kill_all_agents()
+            except Exception as e:
+                print(f"[WARNING] agent 정리 실패: {e}")
+                print("계속 진행합니다...")
 
-        # VM 재부팅
-        print("\n[5-0] VM 재부팅")
-        print("-" * 70)
-        try:
-            controller.restore_and_boot_all()
-        except Exception as e:
-            print(f"  [WARNING] VM 재부팅 실패: {str(e)}")
-            print("  계속 진행합니다...")
+            # VM 재부팅
+            print("\n[5-0] VM 재부팅")
+            print("-" * 70)
+            try:
+                controller.restore_and_boot_all()
+            except Exception as e:
+                print(f"  [WARNING] VM 재부팅 실패: {str(e)}")
+                print("  계속 진행합니다...")
+        else:
+            print("\n[5-0] VM 재부팅 (Step 4에서 이미 시작됨)")
+            print("-" * 70)
+            print("  [INFO] VM이 부팅 중입니다. 에이전트 대기로 진행합니다.")
 
         # 에이전트 대기
         print("\n[5-1] Caldera 에이전트 대기")
@@ -518,44 +550,41 @@ def main():
             print(f"\n  수정된 Ability 재업로드 및 재실행 (재시도 {retry_count + 1})")
             print("  " + "-" * 66)
 
-            # 수정된 abilities 재업로드
-            print("  수정된 abilities 재업로드 중...")
-            uploader = CalderaUploader()
-            uploader.upload_abilities(str(abilities_file))
-            print("  [OK] 재업로드 완료")
-
+            # [최적화] VM 재부팅을 먼저 시작하고, 재부팅 중에 재업로드 수행
             # VM 종료 (재실행 전)
-            print("\n  VM 종료 (재실행 전)")
+            print("\n  [최적화] VM 종료 및 재부팅 시작 (백그라운드)")
             print("  " + "-" * 66)
             try:
                 controller.shutdown_all()
             except Exception as e:
                 print(f"    [WARNING] VM 종료 실패: {e}")
-                print("    계속 진행합니다...")
 
             # Agent 정리 (재실행 전)
-            print("\n  Caldera agent 정리 (재실행 전)")
-            print("  " + "-" * 66)
             try:
                 agent_manager.kill_all_agents()
             except Exception as e:
                 print(f"    [WARNING] agent 정리 실패: {e}")
-                print("    계속 진행합니다...")
 
-            # VM 재부팅 (재실행 전)
-            print("\n  VM 재부팅 (재실행 전)")
-            print("  " + "-" * 66)
+            # VM 재부팅 시작 (백그라운드)
             try:
                 controller.restore_and_boot_all()
+                print("  [OK] VM 재부팅 시작됨")
             except Exception as e:
                 print(f"    [WARNING] VM 재부팅 실패: {str(e)}")
-                print("    계속 진행합니다...")
 
-            # 에이전트 대기 (재실행 전)
-            print("\n  Caldera 에이전트 대기 (재실행 전)")
+            # VM이 부팅되는 동안 수정된 abilities 재업로드
+            print("\n  수정된 abilities 재업로드 중 (VM 부팅 중)...")
+            print("  " + "-" * 66)
+            uploader = CalderaUploader()
+            uploader.upload_abilities(str(abilities_file))
+            print("  [OK] 재업로드 완료")
+
+            # 에이전트 대기 (VM 부팅 완료 대기)
+            print("\n  Caldera 에이전트 대기 (VM 부팅 완료 대기)")
             print("  " + "-" * 66)
             try:
                 agent_manager.wait_for_agents(expected_count=1, timeout=300, check_interval=5, exact=True)
+                print("  [OK] 에이전트 준비 완료")
             except TimeoutError as e:
                 print(f"    [ERROR] {e}")
                 print("    에이전트가 정확히 1개가 아닙니다. VM 및 에이전트 설정을 확인하세요.")

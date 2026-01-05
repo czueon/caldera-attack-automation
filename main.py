@@ -287,10 +287,19 @@ def main():
         print("\n[Step 5] Caldera 자동화 (업로드 → 실행 → Self-Correcting)")
         print("-" * 70)
 
-        # Agent Manager 초기화
+        # Agent Manager 및 VM Controller 초기화
         agent_manager = AgentManager()
+        controller = vm_reload.VBoxController()
 
-        print("\n[5-pre] Caldera agent 정리")
+        print("\n[5-pre-1] VM 종료")
+        print("-" * 70)
+        try:
+            controller.shutdown_all()
+        except Exception as e:
+            print(f"[WARNING] VM 종료 실패: {e}")
+            print("계속 진행합니다...")
+
+        print("\n[5-pre-2] Caldera agent 정리")
         print("-" * 70)
         try:
             agent_manager.kill_all_agents()
@@ -302,20 +311,19 @@ def main():
         print("\n[5-0] VM 재부팅")
         print("-" * 70)
         try:
-            controller = vm_reload.VBoxController()
             controller.restore_and_boot_all()
         except Exception as e:
             print(f"  [WARNING] VM 재부팅 실패: {str(e)}")
             print("  계속 진행합니다...")
 
         # 에이전트 대기
-        print("\n[5-0-1] Caldera 에이전트 대기")
+        print("\n[5-1] Caldera 에이전트 대기")
         print("-" * 70)
         try:
-            agent_manager.wait_for_agents(expected_count=1, timeout=300, check_interval=5)
+            agent_manager.wait_for_agents(expected_count=1, timeout=300, check_interval=5, exact=True)
         except TimeoutError as e:
             print(f"  [ERROR] {e}")
-            print("  에이전트가 생성되지 않았습니다. VM 및 에이전트 설정을 확인하세요.")
+            print("  에이전트가 정확히 1개가 아닙니다. VM 및 에이전트 설정을 확인하세요.")
             sys.exit(1)
         except Exception as e:
             print(f"  [WARNING] 에이전트 대기 실패: {e}")
@@ -516,18 +524,28 @@ def main():
             uploader.upload_abilities(str(abilities_file))
             print("  [OK] 재업로드 완료")
 
+            # VM 종료 (재실행 전)
+            print("\n  VM 종료 (재실행 전)")
+            print("  " + "-" * 66)
+            try:
+                controller.shutdown_all()
+            except Exception as e:
+                print(f"    [WARNING] VM 종료 실패: {e}")
+                print("    계속 진행합니다...")
+
+            # Agent 정리 (재실행 전)
+            print("\n  Caldera agent 정리 (재실행 전)")
             print("  " + "-" * 66)
             try:
                 agent_manager.kill_all_agents()
             except Exception as e:
-                print(f"  [WARNING] agent 정리 실패: {e}")
-                print("  계속 진행합니다...")
+                print(f"    [WARNING] agent 정리 실패: {e}")
+                print("    계속 진행합니다...")
 
             # VM 재부팅 (재실행 전)
             print("\n  VM 재부팅 (재실행 전)")
             print("  " + "-" * 66)
             try:
-                controller = vm_reload.VBoxController()
                 controller.restore_and_boot_all()
             except Exception as e:
                 print(f"    [WARNING] VM 재부팅 실패: {str(e)}")
@@ -537,10 +555,10 @@ def main():
             print("\n  Caldera 에이전트 대기 (재실행 전)")
             print("  " + "-" * 66)
             try:
-                agent_manager.wait_for_agents(expected_count=1, timeout=300, check_interval=5)
+                agent_manager.wait_for_agents(expected_count=1, timeout=300, check_interval=5, exact=True)
             except TimeoutError as e:
                 print(f"    [ERROR] {e}")
-                print("    에이전트가 생성되지 않았습니다. VM 및 에이전트 설정을 확인하세요.")
+                print("    에이전트가 정확히 1개가 아닙니다. VM 및 에이전트 설정을 확인하세요.")
                 break
             except Exception as e:
                 print(f"    [WARNING] 에이전트 대기 실패: {e}")

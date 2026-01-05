@@ -58,22 +58,27 @@ class AgentManager:
         print("[OK] 모든 agent 삭제 완료")
         return len(agents)
 
-    def wait_for_agents(self, expected_count=1, timeout=300, check_interval=5):
+    def wait_for_agents(self, expected_count=1, timeout=300, check_interval=5, exact=False):
         """
         에이전트가 생성될 때까지 대기.
 
         Args:
-            expected_count: 기대하는 최소 에이전트 수 (기본값: 1).
+            expected_count: 기대하는 에이전트 수 (기본값: 1).
             timeout: 최대 대기 시간(초) (기본값: 300초 = 5분).
             check_interval: 체크 간격(초) (기본값: 5초).
+            exact: True면 정확히 expected_count개, False면 최소 expected_count개 (기본값: False).
+                  exact=True일 때는 많거나 적으면 모두 대기.
 
         Returns:
             list: 연결된 에이전트 목록.
 
         Raises:
-            TimeoutError: 타임아웃 시간 내에 에이전트가 생성되지 않은 경우.
+            TimeoutError: 타임아웃 시간 내에 조건을 만족하는 에이전트가 생성되지 않은 경우.
         """
-        print(f"[INFO] 에이전트 대기 중... (최소 {expected_count}개, 최대 {timeout}초)")
+        if exact:
+            print(f"[INFO] 에이전트 대기 중... (정확히 {expected_count}개, 최대 {timeout}초)")
+        else:
+            print(f"[INFO] 에이전트 대기 중... (최소 {expected_count}개, 최대 {timeout}초)")
 
         elapsed = 0
         while elapsed < timeout:
@@ -81,21 +86,41 @@ class AgentManager:
                 agents = self.get_agents()
                 agent_count = len(agents)
 
-                if agent_count >= expected_count:
-                    print(f"[OK] 에이전트 {agent_count}개 확인됨")
-                    for agent in agents:
-                        paw = agent.get('paw', 'unknown')
-                        platform = agent.get('platform', 'unknown')
-                        print(f"  - Agent PAW: {paw}, Platform: {platform}")
-                    return agents
+                # exact=True: 정확히 일치해야 함
+                if exact:
+                    if agent_count == expected_count:
+                        print(f"[OK] 에이전트 정확히 {agent_count}개 확인됨")
+                        for agent in agents:
+                            paw = agent.get('paw', 'unknown')
+                            platform = agent.get('platform', 'unknown')
+                            print(f"  - Agent PAW: {paw}, Platform: {platform}")
+                        return agents
+                    else:
+                        # 에이전트가 많거나 적은 경우 모두 대기
+                        print(f"  [{elapsed}초] 에이전트 {agent_count}/{expected_count}개 확인됨, 대기 중...")
+                # exact=False: 최소 개수만 만족하면 됨
                 else:
-                    print(f"  [{elapsed}초] 에이전트 {agent_count}/{expected_count}개 확인됨, 대기 중...")
+                    if agent_count >= expected_count:
+                        print(f"[OK] 에이전트 {agent_count}개 확인됨")
+                        for agent in agents:
+                            paw = agent.get('paw', 'unknown')
+                            platform = agent.get('platform', 'unknown')
+                            print(f"  - Agent PAW: {paw}, Platform: {platform}")
+                        return agents
+                    else:
+                        print(f"  [{elapsed}초] 에이전트 {agent_count}/{expected_count}개 확인됨, 대기 중...")
             except Exception as e:
                 print(f"  [{elapsed}초] 에이전트 조회 실패 ({e}), 재시도 중...")
 
             time.sleep(check_interval)
             elapsed += check_interval
 
-        raise TimeoutError(
-            f"타임아웃: {timeout}초 내에 에이전트 {expected_count}개가 생성되지 않았습니다."
-        )
+        if exact:
+            raise TimeoutError(
+                f"타임아웃: {timeout}초 내에 에이전트 정확히 {expected_count}개가 생성되지 않았습니다."
+            )
+        else:
+            raise TimeoutError(
+                f"타임아웃: {timeout}초 내에 에이전트 최소 {expected_count}개가 생성되지 않았습니다."
+            )
+

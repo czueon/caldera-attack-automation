@@ -9,15 +9,6 @@ url: "https://alpakalee.github.io"
 minima:
   skin: classic
 
-header_pages:
-  - pages/overview.md
-  - pages/installation.md
-  - pages/configuration.md
-  - pages/usage.md
-  - pages/results.md
-  - pages/self-correction.md
-  - pages/demo.md
-
 plugins:
   - jekyll-seo-tag
   - jekyll-feed

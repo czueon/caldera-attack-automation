@@ -14,14 +14,14 @@
     {
       "tactic": "Reconnaissance",
       "kisa_name": "Gather Victim Identity Information",
-      "technique_id": "T1053.002",
-      "technique_name": "At"
+      "technique_id": "T1589",
+      "technique_name": "Gather Victim Identity Information"
     },
     {
       "tactic": "Reconnaissance",
       "kisa_name": "Gather Victim Org Information",
-      "technique_id": "T1053.002",
-      "technique_name": "At"
+      "technique_id": "T1591",
+      "technique_name": "Gather Victim Org Information"
     },
     {
       "tactic": "Reconnaissance",
@@ -32,8 +32,8 @@
     {
       "tactic": "Reconnaissance",
       "kisa_name": "Phishing for Information",
-      "technique_id": "T1053.002",
-      "technique_name": "At"
+      "technique_id": "T1598",
+      "technique_name": "Phishing for Information"
     },
     {
       "tactic": "Resource Development",
@@ -80,8 +80,8 @@
     {
       "tactic": "Initial Access",
       "kisa_name": "Exploit Public Facing Application",
-      "technique_id": "T1053.002",
-      "technique_name": "At"
+      "technique_id": "T1190",
+      "technique_name": "Exploit Public Facing Application"
     },
     {
       "tactic": "Execution",
@@ -134,8 +134,8 @@
     {
       "tactic": "Credential Access",
       "kisa_name": "Two-Factor Authentication Interception",
-      "technique_id": "T1053.002",
-      "technique_name": "At"
+      "technique_id": "T1111",
+      "technique_name": "Two-Factor Authentication Interception"
     },
     {
       "tactic": "Credential Access",
@@ -261,19 +261,20 @@
     "T1030",
     "T1036",
     "T1053",
-    "T1053.002",
     "T1056",
     "T1059",
     "T1070",
     "T1071",
     "T1083",
     "T1102",
+    "T1111",
     "T1113",
     "T1114",
     "T1119",
     "T1132",
     "T1136",
     "T1140",
+    "T1190",
     "T1204",
     "T1534",
     "T1547",
@@ -287,7 +288,10 @@
     "T1586",
     "T1587",
     "T1588",
+    "T1589",
+    "T1591",
     "T1593",
-    "T1594"
+    "T1594",
+    "T1598"
   ]
 }

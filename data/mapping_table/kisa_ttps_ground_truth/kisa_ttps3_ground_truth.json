@@ -164,14 +164,14 @@
     {
       "tactic": "Command and Control",
       "kisa_name": "Standard Non-Application Layer Protocol",
-      "technique_id": "T1053.002",
-      "technique_name": "At"
+      "technique_id": "T1095",
+      "technique_name": "Non-Application Layer Protocol"
     },
     {
       "tactic": "Exfiltration",
       "kisa_name": "Data Encrypted",
-      "technique_id": "T1053.002",
-      "technique_name": "At"
+      "technique_id": "T1560",
+      "technique_name": "Archive Collected Data"
     },
     {
       "tactic": "Exfiltration",
@@ -192,7 +192,6 @@
     "T1018",
     "T1027",
     "T1041",
-    "T1053.002",
     "T1055",
     "T1056",
     "T1056.004",
@@ -202,12 +201,14 @@
     "T1080",
     "T1082",
     "T1091",
+    "T1095",
     "T1115",
     "T1210",
     "T1518.001",
     "T1543.003",
     "T1547.001",
     "T1552.001",
+    "T1560",
     "T1562.001",
     "T1569.002",
     "T1573"

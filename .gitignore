@@ -22,3 +22,6 @@ Thumbs.db
 
 # Results
 data/processed/
+
+# backup
+backup/

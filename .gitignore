@@ -15,13 +15,19 @@ env/
 .vscode/
 .idea/
 .claude/
+.cursorrules
 
 # OS
 .DS_Store
 Thumbs.db
 
-# Results
-data/processed/
+# Data (not tracked — see README for download instructions)
+data/
 
 # backup
 backup/
+
+# Notes
+논문/
+plan.md
+reports/

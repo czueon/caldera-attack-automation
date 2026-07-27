@@ -1,0 +1,34 @@
+title: "Automatic End-to-End Adversary Emulation with Self-Correction from Cyber Threat Intelligence Using LLM"
+description: "An automated pipeline that converts Cyber Threat Intelligence PDF reports into executable MITRE Caldera adversary emulation scenarios using LLMs, with a domain-specific self-correcting engine."
+
+theme: minima
+
+baseurl: "/testcaldera"
+url: "https://alpakalee.github.io"
+
+minima:
+  skin: classic
+
+header_pages:
+  - pages/overview.md
+  - pages/installation.md
+  - pages/configuration.md
+  - pages/usage.md
+  - pages/results.md
+  - pages/self-correction.md
+  - pages/demo.md
+
+plugins:
+  - jekyll-seo-tag
+  - jekyll-feed
+
+exclude:
+  - "*.py"
+  - requirements.txt
+  - ".env*"
+  - data/
+  - modules/
+  - scripts/
+  - 논문/
+  - 환경 설계/
+  - plan.md

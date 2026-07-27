@@ -1,0 +1,172 @@
+{
+  "metadata": {
+    "source": "KISA_TTPs_6",
+    "mitre_version": "15.1",
+    "total_techniques": 23
+  },
+  "techniques": [
+    {
+      "tactic": "Reconnaissance",
+      "kisa_name": "T1590.005 Gather Victim Network Information",
+      "technique_id": "T1590.005",
+      "technique_name": "Gather Victim Network Information"
+    },
+    {
+      "tactic": "Resource Development",
+      "kisa_name": "T1583.003 Acquire Infrastructure",
+      "technique_id": "T1583.003",
+      "technique_name": "Acquire Infrastructure"
+    },
+    {
+      "tactic": "Resource Development",
+      "kisa_name": "T1584.004 Compromise Infrastructure",
+      "technique_id": "T1584.004",
+      "technique_name": "Compromise Infrastructure"
+    },
+    {
+      "tactic": "Resource Development",
+      "kisa_name": "T1587.001 Develop Capabilities",
+      "technique_id": "T1587.001",
+      "technique_name": "Develop Capabilities"
+    },
+    {
+      "tactic": "Resource Development",
+      "kisa_name": "T1608.004 Stage Capabilities",
+      "technique_id": "T1608.004",
+      "technique_name": "Stage Capabilities"
+    },
+    {
+      "tactic": "Initial Access",
+      "kisa_name": "T1189 Drive-by Compromise",
+      "technique_id": "T1189",
+      "technique_name": "Drive-by Compromise"
+    },
+    {
+      "tactic": "Execution",
+      "kisa_name": "T1203 Exploitation for Client Execution",
+      "technique_id": "T1203",
+      "technique_name": "Exploitation for Client Execution"
+    },
+    {
+      "tactic": "Execution",
+      "kisa_name": "T1059 Command and Scripting Interpreter",
+      "technique_id": "T1059",
+      "technique_name": "Command and Scripting Interpreter"
+    },
+    {
+      "tactic": "Persistence",
+      "kisa_name": "T1547.001 Boot or Logon Autostart Execution",
+      "technique_id": "T1547.001",
+      "technique_name": "Boot or Logon Autostart Execution"
+    },
+    {
+      "tactic": "Persistence",
+      "kisa_name": "T1053.005 Scheduled Task/Job",
+      "technique_id": "T1053.005",
+      "technique_name": "Scheduled Task/Job"
+    },
+    {
+      "tactic": "Defense Evasion",
+      "kisa_name": "T1218.005 Signed Binary Proxy Execution",
+      "technique_id": "T1218.005",
+      "technique_name": "Signed Binary Proxy Execution"
+    },
+    {
+      "tactic": "Defense Evasion",
+      "kisa_name": "T1036.005 Masquerading",
+      "technique_id": "T1036.005",
+      "technique_name": "Masquerading"
+    },
+    {
+      "tactic": "Defense Evasion",
+      "kisa_name": "T1140 Deobfuscate/Decode Files or Information",
+      "technique_id": "T1140",
+      "technique_name": "Deobfuscate/Decode Files or Information"
+    },
+    {
+      "tactic": "Discovery",
+      "kisa_name": "T1033 System Owner/User Discovery",
+      "technique_id": "T1033",
+      "technique_name": "System Owner/User Discovery"
+    },
+    {
+      "tactic": "Collection",
+      "kisa_name": "T1560.002 Archive Collected Data",
+      "technique_id": "T1560.002",
+      "technique_name": "Archive Collected Data"
+    },
+    {
+      "tactic": "Collection",
+      "kisa_name": "T1119 Automated Collection",
+      "technique_id": "T1119",
+      "technique_name": "Automated Collection"
+    },
+    {
+      "tactic": "Collection",
+      "kisa_name": "T1005 Data from Local System",
+      "technique_id": "T1005",
+      "technique_name": "Data from Local System"
+    },
+    {
+      "tactic": "Collection",
+      "kisa_name": "T1056.001 Input Capture",
+      "technique_id": "T1056.001",
+      "technique_name": "Input Capture"
+    },
+    {
+      "tactic": "Collection",
+      "kisa_name": "T1113 Screen Capture",
+      "technique_id": "T1113",
+      "technique_name": "Screen Capture"
+    },
+    {
+      "tactic": "Command and Control",
+      "kisa_name": "T1071.001 Application Layer Protocol",
+      "technique_id": "T1071.001",
+      "technique_name": "Application Layer Protocol"
+    },
+    {
+      "tactic": "Command and Control",
+      "kisa_name": "T1132.001 Data Encoding",
+      "technique_id": "T1132.001",
+      "technique_name": "Data Encoding"
+    },
+    {
+      "tactic": "Command and Control",
+      "kisa_name": "T1573.001 Encrypted Channel",
+      "technique_id": "T1573.001",
+      "technique_name": "Encrypted Channel"
+    },
+    {
+      "tactic": "Exfiltration",
+      "kisa_name": "T1041 Exfiltration Over C2 Channel",
+      "technique_id": "T1041",
+      "technique_name": "Exfiltration Over C2 Channel"
+    }
+  ],
+  "unique_ids": [
+    "T1005",
+    "T1033",
+    "T1036.005",
+    "T1041",
+    "T1053.005",
+    "T1056.001",
+    "T1059",
+    "T1071.001",
+    "T1113",
+    "T1119",
+    "T1132.001",
+    "T1140",
+    "T1189",
+    "T1203",
+    "T1218.005",
+    "T1547.001",
+    "T1560.002",
+    "T1573.001",
+    "T1583.003",
+    "T1584.004",
+    "T1587.001",
+    "T1590.005",
+    "T1608.004"
+  ]
+}

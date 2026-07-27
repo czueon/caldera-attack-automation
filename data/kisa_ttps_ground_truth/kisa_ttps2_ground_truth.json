@@ -1,0 +1,427 @@
+{
+  "metadata": {
+    "source": "KISA_TTPs_2",
+    "mitre_version": "15.1",
+    "total_techniques": 60
+  },
+  "techniques": [
+    {
+      "tactic": "Initial Access",
+      "kisa_name": "Spearphishing Attachment",
+      "technique_id": "T1566.001",
+      "technique_name": "Spearphishing Attachment"
+    },
+    {
+      "tactic": "Initial Access",
+      "kisa_name": "Spearphishing Link",
+      "technique_id": "T1566.002",
+      "technique_name": "Spearphishing Link"
+    },
+    {
+      "tactic": "Initial Access",
+      "kisa_name": "Exploit Public-Facing Application",
+      "technique_id": "T1190",
+      "technique_name": "Exploit Public-Facing Application"
+    },
+    {
+      "tactic": "Initial Access",
+      "kisa_name": "Drive-by Compromise",
+      "technique_id": "T1189",
+      "technique_name": "Drive-by Compromise"
+    },
+    {
+      "tactic": "Execution",
+      "kisa_name": "Command-Line Interface",
+      "technique_id": "T1059",
+      "technique_name": "Command and Scripting Interpreter"
+    },
+    {
+      "tactic": "Execution",
+      "kisa_name": "User Execution",
+      "technique_id": "T1204",
+      "technique_name": "User Execution"
+    },
+    {
+      "tactic": "Execution",
+      "kisa_name": "Execution through API",
+      "technique_id": "T1106",
+      "technique_name": "Native API"
+    },
+    {
+      "tactic": "Execution",
+      "kisa_name": "Execution through Module Load",
+      "technique_id": "T1129",
+      "technique_name": "Shared Modules"
+    },
+    {
+      "tactic": "Execution",
+      "kisa_name": "Service Execution",
+      "technique_id": "T1569.002",
+      "technique_name": "Service Execution"
+    },
+    {
+      "tactic": "Execution",
+      "kisa_name": "Windows Management Instrumentation",
+      "technique_id": "T1047",
+      "technique_name": "Windows Management Instrumentation"
+    },
+    {
+      "tactic": "Persistence",
+      "kisa_name": "Web Shell",
+      "technique_id": "T1505.003",
+      "technique_name": "Web Shell"
+    },
+    {
+      "tactic": "Persistence",
+      "kisa_name": "Redundant Access",
+      "technique_id": "T1078",
+      "technique_name": "Valid Accounts"
+    },
+    {
+      "tactic": "Persistence",
+      "kisa_name": "New Service",
+      "technique_id": "T1543.003",
+      "technique_name": "Windows Service"
+    },
+    {
+      "tactic": "Persistence",
+      "kisa_name": "Registry Run Keys / Start Folder",
+      "technique_id": "T1547.001",
+      "technique_name": "Registry Run Keys / Startup Folder"
+    },
+    {
+      "tactic": "Privilege Escalation",
+      "kisa_name": "Exploitation for Privilege Escalation",
+      "technique_id": "T1068",
+      "technique_name": "Exploitation for Privilege Escalation"
+    },
+    {
+      "tactic": "Privilege Escalation",
+      "kisa_name": "Bypass User Account Control",
+      "technique_id": "T1548.002",
+      "technique_name": "Bypass User Account Control"
+    },
+    {
+      "tactic": "Privilege Escalation",
+      "kisa_name": "New Service",
+      "technique_id": "T1543.003",
+      "technique_name": "Windows Service"
+    },
+    {
+      "tactic": "Defense Evasion",
+      "kisa_name": "Masquerading",
+      "technique_id": "T1036",
+      "technique_name": "Masquerading"
+    },
+    {
+      "tactic": "Defense Evasion",
+      "kisa_name": "Indicator Removal on Host",
+      "technique_id": "T1070",
+      "technique_name": "Indicator Removal"
+    },
+    {
+      "tactic": "Defense Evasion",
+      "kisa_name": "File Deletion",
+      "technique_id": "T1070.004",
+      "technique_name": "File Deletion"
+    },
+    {
+      "tactic": "Defense Evasion",
+      "kisa_name": "Software Packing",
+      "technique_id": "T1027.002",
+      "technique_name": "Software Packing"
+    },
+    {
+      "tactic": "Defense Evasion",
+      "kisa_name": "Redundant Access",
+      "technique_id": "T1078",
+      "technique_name": "Valid Accounts"
+    },
+    {
+      "tactic": "Defense Evasion",
+      "kisa_name": "Process Injection",
+      "technique_id": "T1055",
+      "technique_name": "Process Injection"
+    },
+    {
+      "tactic": "Defense Evasion",
+      "kisa_name": "Obfuscated Files or Information",
+      "technique_id": "T1027",
+      "technique_name": "Obfuscated Files or Information"
+    },
+    {
+      "tactic": "Credential Access",
+      "kisa_name": "Credentials in Files",
+      "technique_id": "T1552.001",
+      "technique_name": "Credentials In Files"
+    },
+    {
+      "tactic": "Credential Access",
+      "kisa_name": "LLMNR/NBT-NS Poisoning",
+      "technique_id": "T1557.001",
+      "technique_name": "LLMNR/NBT-NS Poisoning and SMB Relay"
+    },
+    {
+      "tactic": "Credential Access",
+      "kisa_name": "Private Key",
+      "technique_id": "T1053.002",
+      "technique_name": "At"
+    },
+    {
+      "tactic": "Discovery",
+      "kisa_name": "File and Directory Discovery",
+      "technique_id": "T1083",
+      "technique_name": "File and Directory Discovery"
+    },
+    {
+      "tactic": "Discovery",
+      "kisa_name": "Browser Bookmark Discovery",
+      "technique_id": "T1217",
+      "technique_name": "Browser Information Discovery"
+    },
+    {
+      "tactic": "Discovery",
+      "kisa_name": "System Time Discovery",
+      "technique_id": "T1124",
+      "technique_name": "System Time Discovery"
+    },
+    {
+      "tactic": "Discovery",
+      "kisa_name": "Security Software Discovery",
+      "technique_id": "T1518.001",
+      "technique_name": "Security Software Discovery"
+    },
+    {
+      "tactic": "Discovery",
+      "kisa_name": "Query Registry",
+      "technique_id": "T1012",
+      "technique_name": "Query Registry"
+    },
+    {
+      "tactic": "Discovery",
+      "kisa_name": "Process Discovery",
+      "technique_id": "T1057",
+      "technique_name": "Process Discovery"
+    },
+    {
+      "tactic": "Discovery",
+      "kisa_name": "System Owner/User Discovery",
+      "technique_id": "T1033",
+      "technique_name": "System Owner/User Discovery"
+    },
+    {
+      "tactic": "Discovery",
+      "kisa_name": "System Information Discovery",
+      "technique_id": "T1082",
+      "technique_name": "System Information Discovery"
+    },
+    {
+      "tactic": "Discovery",
+      "kisa_name": "System Network Configuration Discovery",
+      "technique_id": "T1016",
+      "technique_name": "System Network Configuration Discovery"
+    },
+    {
+      "tactic": "Discovery",
+      "kisa_name": "Account Discovery",
+      "technique_id": "T1087",
+      "technique_name": "Account Discovery"
+    },
+    {
+      "tactic": "Discovery",
+      "kisa_name": "Remote System Discovery",
+      "technique_id": "T1018",
+      "technique_name": "Remote System Discovery"
+    },
+    {
+      "tactic": "Discovery",
+      "kisa_name": "System Service Discovery",
+      "technique_id": "T1007",
+      "technique_name": "System Service Discovery"
+    },
+    {
+      "tactic": "Discovery",
+      "kisa_name": "System Network Connections Discovery",
+      "technique_id": "T1049",
+      "technique_name": "System Network Connections Discovery"
+    },
+    {
+      "tactic": "Lateral Movement",
+      "kisa_name": "Windows Admin Shares",
+      "technique_id": "T1021.002",
+      "technique_name": "SMB/Windows Admin Shares"
+    },
+    {
+      "tactic": "Collection",
+      "kisa_name": "Data from Local System",
+      "technique_id": "T1005",
+      "technique_name": "Data from Local System"
+    },
+    {
+      "tactic": "Collection",
+      "kisa_name": "Data from Network Shared Drive",
+      "technique_id": "T1039",
+      "technique_name": "Data from Network Shared Drive"
+    },
+    {
+      "tactic": "Collection",
+      "kisa_name": "Data Staged",
+      "technique_id": "T1074",
+      "technique_name": "Data Staged"
+    },
+    {
+      "tactic": "Command and Control",
+      "kisa_name": "Standard Cryptographic Protocol",
+      "technique_id": "T1573",
+      "technique_name": "Encrypted Channel"
+    },
+    {
+      "tactic": "Command and Control",
+      "kisa_name": "Multi-Stage Channels",
+      "technique_id": "T1104",
+      "technique_name": "Multi-Stage Channels"
+    },
+    {
+      "tactic": "Command and Control",
+      "kisa_name": "Connection Proxy",
+      "technique_id": "T1090",
+      "technique_name": "Proxy"
+    },
+    {
+      "tactic": "Command and Control",
+      "kisa_name": "Remote File Copy",
+      "technique_id": "T1105",
+      "technique_name": "Ingress Tool Transfer"
+    },
+    {
+      "tactic": "Command and Control",
+      "kisa_name": "Custom Cryptographic Protocol",
+      "technique_id": "T1573",
+      "technique_name": "Encrypted Channel"
+    },
+    {
+      "tactic": "Command and Control",
+      "kisa_name": "Multilayer Encryption",
+      "technique_id": "T1573.002",
+      "technique_name": "Asymmetric Cryptography"
+    },
+    {
+      "tactic": "Command and Control",
+      "kisa_name": "Data Encoding",
+      "technique_id": "T1132",
+      "technique_name": "Data Encoding"
+    },
+    {
+      "tactic": "Command and Control",
+      "kisa_name": "Data Obfuscation",
+      "technique_id": "T1001",
+      "technique_name": "Data Obfuscation"
+    },
+    {
+      "tactic": "Command and Control",
+      "kisa_name": "Commonly Used Port",
+      "technique_id": "T1571",
+      "technique_name": "Non-Standard Port"
+    },
+    {
+      "tactic": "Command and Control",
+      "kisa_name": "Standard Application Layer Protocol",
+      "technique_id": "T1071",
+      "technique_name": "Application Layer Protocol"
+    },
+    {
+      "tactic": "Exfiltration",
+      "kisa_name": "Data Encrypted",
+      "technique_id": "T1053.002",
+      "technique_name": "At"
+    },
+    {
+      "tactic": "Exfiltration",
+      "kisa_name": "Data Transfer Size Limits",
+      "technique_id": "T1030",
+      "technique_name": "Data Transfer Size Limits"
+    },
+    {
+      "tactic": "Exfiltration",
+      "kisa_name": "Data Compressed",
+      "technique_id": "T1560",
+      "technique_name": "Archive Collected Data"
+    },
+    {
+      "tactic": "Exfiltration",
+      "kisa_name": "Exfiltration Over Command and Control Channel",
+      "technique_id": "T1041",
+      "technique_name": "Exfiltration Over C2 Channel"
+    },
+    {
+      "tactic": "Exfiltration",
+      "kisa_name": "Exfiltration Over Alternative Protocol",
+      "technique_id": "T1048",
+      "technique_name": "Exfiltration Over Alternative Protocol"
+    },
+    {
+      "tactic": "Impact",
+      "kisa_name": "Data Destruction",
+      "technique_id": "T1485",
+      "technique_name": "Data Destruction"
+    }
+  ],
+  "unique_ids": [
+    "T1001",
+    "T1005",
+    "T1007",
+    "T1012",
+    "T1016",
+    "T1018",
+    "T1021.002",
+    "T1027",
+    "T1027.002",
+    "T1030",
+    "T1033",
+    "T1036",
+    "T1039",
+    "T1041",
+    "T1047",
+    "T1048",
+    "T1049",
+    "T1053.002",
+    "T1055",
+    "T1057",
+    "T1059",
+    "T1068",
+    "T1070",
+    "T1070.004",
+    "T1071",
+    "T1074",
+    "T1078",
+    "T1082",
+    "T1083",
+    "T1087",
+    "T1090",
+    "T1104",
+    "T1105",
+    "T1106",
+    "T1124",
+    "T1129",
+    "T1132",
+    "T1189",
+    "T1190",
+    "T1204",
+    "T1217",
+    "T1485",
+    "T1505.003",
+    "T1518.001",
+    "T1543.003",
+    "T1547.001",
+    "T1548.002",
+    "T1552.001",
+    "T1557.001",
+    "T1560",
+    "T1566.001",
+    "T1566.002",
+    "T1569.002",
+    "T1571",
+    "T1573",
+    "T1573.002"
+  ]
+}

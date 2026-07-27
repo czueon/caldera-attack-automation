@@ -274,7 +274,7 @@ caldera-attack-automation/
 ├── data/
 │   ├── raw/                      # 입력 KISA PDF (11개)
 │   ├── mitre/                    # MITRE ATT&CK JSON
-│   ├── mapping_table/            # TTP 매핑 및 Ground Truth
+│   ├── kisa_ttps_ground_truth/   # Ground Truth TTP 매핑
 │   └── processed/                # 실험 결과 (타임스탬프별)
 │
 ├── config/

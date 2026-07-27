@@ -1,0 +1,150 @@
+{
+  "metadata": {
+    "source": "KISA_TTPs_10",
+    "mitre_version": "15.1",
+    "total_techniques": 20
+  },
+  "techniques": [
+    {
+      "tactic": "Resource Development",
+      "kisa_name": "Compromise Infrastructure: Server",
+      "technique_id": "T1584.004",
+      "technique_name": "Compromise Infrastructure: Server"
+    },
+    {
+      "tactic": "Initial Access",
+      "kisa_name": "Drive-by Compromise",
+      "technique_id": "T1189",
+      "technique_name": "Drive-by Compromise"
+    },
+    {
+      "tactic": "Execution",
+      "kisa_name": "System Services: Service Execution",
+      "technique_id": "T1569",
+      "technique_name": "System Services"
+    },
+    {
+      "tactic": "Execution",
+      "kisa_name": "Command and Scripting Interpreter: Windows Command Shell",
+      "technique_id": "T1059",
+      "technique_name": "Command and Scripting Interpreter"
+    },
+    {
+      "tactic": "Persistence",
+      "kisa_name": "Create or Modify System Process: Windows Service",
+      "technique_id": "T1543",
+      "technique_name": "Create or Modify System Process"
+    },
+    {
+      "tactic": "Persistence",
+      "kisa_name": "Boot or Logon Autostart Execution: Security Support Provider",
+      "technique_id": "T1547",
+      "technique_name": "Boot or Logon Autostart Execution"
+    },
+    {
+      "tactic": "Privilege Escalation",
+      "kisa_name": "Exploitation for Privilege Escalation",
+      "technique_id": "T1068",
+      "technique_name": "Exploitation for Privilege Escalation"
+    },
+    {
+      "tactic": "Defense Evasion",
+      "kisa_name": "Masquerading: Match Legitimate Name or Location",
+      "technique_id": "T1036.005",
+      "technique_name": "Match Legitimate Name or Location"
+    },
+    {
+      "tactic": "Defense Evasion",
+      "kisa_name": "Masquerading: Masquerade Task or Service",
+      "technique_id": "T1036",
+      "technique_name": "Masquerading"
+    },
+    {
+      "tactic": "Defense Evasion",
+      "kisa_name": "Indicator Removal: Clear Windows Event Logs",
+      "technique_id": "T1070.001",
+      "technique_name": "Clear Windows Event Logs"
+    },
+    {
+      "tactic": "Defense Evasion",
+      "kisa_name": "Indicator Removal: File Deletion",
+      "technique_id": "T1070",
+      "technique_name": "Indicator Removal"
+    },
+    {
+      "tactic": "Credential Access",
+      "kisa_name": "Brute Force: Credential Stuffing",
+      "technique_id": "T1110",
+      "technique_name": "Brute Force"
+    },
+    {
+      "tactic": "Discovery",
+      "kisa_name": "Network Service Discovery",
+      "technique_id": "T1046",
+      "technique_name": "Network Service Discovery"
+    },
+    {
+      "tactic": "Discovery",
+      "kisa_name": "System Network Connections Discovery",
+      "technique_id": "T1049",
+      "technique_name": "System Network Connections Discovery"
+    },
+    {
+      "tactic": "Lateral Movement",
+      "kisa_name": "Exploitation of Remote Services",
+      "technique_id": "T1210",
+      "technique_name": "Exploitation of Remote Services"
+    },
+    {
+      "tactic": "Lateral Movement",
+      "kisa_name": "Remote Services: Remote Desktop Protocol",
+      "technique_id": "T1021",
+      "technique_name": "Remote Services"
+    },
+    {
+      "tactic": "Lateral Movement",
+      "kisa_name": "Remote Services: SMB/Windows Admin Share",
+      "technique_id": "T1021",
+      "technique_name": "Remote Services"
+    },
+    {
+      "tactic": "Collection",
+      "kisa_name": "Input Capture: Keylogging",
+      "technique_id": "T1056.001",
+      "technique_name": "Keylogging"
+    },
+    {
+      "tactic": "Command and Control",
+      "kisa_name": "Proxy: Internal Proxy",
+      "technique_id": "T1090",
+      "technique_name": "Proxy"
+    },
+    {
+      "tactic": "Command and Control",
+      "kisa_name": "Web Service: Bidirectional Communication",
+      "technique_id": "T1053.002",
+      "technique_name": "At"
+    }
+  ],
+  "unique_ids": [
+    "T1021",
+    "T1036",
+    "T1036.005",
+    "T1046",
+    "T1049",
+    "T1053.002",
+    "T1056.001",
+    "T1059",
+    "T1068",
+    "T1070",
+    "T1070.001",
+    "T1090",
+    "T1110",
+    "T1189",
+    "T1210",
+    "T1543",
+    "T1547",
+    "T1569",
+    "T1584.004"
+  ]
+}

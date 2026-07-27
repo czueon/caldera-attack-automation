@@ -21,8 +21,11 @@ env/
 .DS_Store
 Thumbs.db
 
-# Data (not tracked — see README for download instructions)
-data/
+# Data (large/binary files not tracked — see README for download instructions)
+data/raw/
+data/mitre/
+data/output/
+data/processed/
 
 # backup
 backup/

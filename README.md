@@ -245,7 +245,7 @@ data/processed/{pdf_name}/{version_id}/
 
 ### Data Files
 
-The `data/` directory is not included in this repository. Prepare the following manually:
+Most of the `data/` directory is not included in this repository and must be prepared manually. `data/kisa_ttps_ground_truth/` (ground truth TTP mappings) is included in the repository.
 
 **`data/raw/`** — KISA CTI PDF reports (11 files)
 
@@ -265,9 +265,9 @@ data/mitre/v16.0.json   # enterprise-attack-16.0.json
 data/mitre/v18.1.json   # enterprise-attack-18.1.json
 ```
 
-**`data/mapping_table/`** — Ground truth TTP mappings and per-report analysis (used for RQ3 evaluation)
+**`data/kisa_ttps_ground_truth/`** — Ground truth TTP mappings (used for RQ3 evaluation)
 
-Will be released after paper publication.
+Included in this repository.
 
 ---
 
@@ -313,7 +313,7 @@ caldera-attack-automation/
 ├── data/
 │   ├── raw/                      # Input KISA PDFs (11 files)
 │   ├── mitre/                    # MITRE ATT&CK JSON (v15.1, v16, v18)
-│   ├── mapping_table/            # TTP mappings & ground truth
+│   ├── kisa_ttps_ground_truth/   # Ground truth TTP mappings
 │   └── processed/                # Experiment outputs (timestamped)
 │
 ├── config/

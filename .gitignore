@@ -27,6 +27,14 @@ data/mitre/
 data/output/
 data/processed/
 
+# Knowledge base (regenerable — see data/knowledge_base/README.md to rebuild)
+data/knowledge_base/*
+!data/knowledge_base/README.md
+
+# Experiments (regenerable outputs — see data/experiments/scripts/ to reproduce; scripts themselves stay tracked)
+data/experiments/*
+!data/experiments/scripts
+
 # backup
 backup/
 

@@ -363,6 +363,19 @@ def _run_dir(llm: str, repeat: int, pdf_stem: str, run_id: str) -> Path:
     return RUNS_DIR / llm / f"repeat_{repeat}" / pdf_stem / run_id
 
 
+def _done_repeats(llm: str, pdf_stem: str) -> int:
+    """이 llm+report 조합에서 이미 실행된 가장 큰 repeat 번호 (없으면 0)."""
+    done = 0
+    for repeat_dir in RUNS_DIR.glob(f"{llm}/repeat_*"):
+        if not (repeat_dir / pdf_stem).exists():
+            continue
+        try:
+            done = max(done, int(repeat_dir.name.removeprefix("repeat_")))
+        except ValueError:
+            pass
+    return done
+
+
 def _main_output_dir_and_version(llm: str, repeat: int, sub_version: str) -> tuple:
     """main.py의 --output-dir/--version-id 조합. main.py는 항상
     output_dir/pdf_stem/version_id 순서로 base_dir을 만들기 때문에, pdf_stem 뒤에
@@ -469,7 +482,14 @@ def cmd_generate(args):
         print(f"[WARNING] --step {args.step}에 3 이상이 없어 KB 조건별로 실행할 게 없습니다 "
               "(step1/2 생성만 하고 종료)")
 
-    total_runs = len(reports) * len(llms) * 2 * args.repeats
+    repeat_ranges = {
+        (report["id"], llm): range(_done_repeats(llm, Path(report["pdf"]).stem) + 1, args.repeats + 1)
+        for report in reports for llm in llms
+    }
+    total_runs = sum(len(r) for r in repeat_ranges.values()) * 2
+    skipped = sum(1 for r in repeat_ranges.values() if len(r) == 0)
+    if skipped:
+        print(f"[INFO] {skipped}개 report+llm 조합은 이미 --repeats {args.repeats}만큼 실행되어 건너뜁니다")
     run_idx = 0
 
     with open(manifest_path, "w", encoding="utf-8") as manifest_f:
@@ -477,7 +497,7 @@ def cmd_generate(args):
             pdf_stem = Path(report["pdf"]).stem
             _apply_report_vbox_config(report["id"])
             for llm in llms:
-                for repeat in range(1, args.repeats + 1):
+                for repeat in repeat_ranges[(report["id"], llm)]:
                     run_id = f"run_{datetime.now().strftime('%H%M%S')}"
                     run_label = f"report={report['id']} llm={llm} repeat={repeat}"
 
@@ -711,7 +731,10 @@ def main():
     p1.add_argument("--llms", type=str, default="claude", help="쉼표로 구분된 LLM 목록 (예: claude,gemini)")
     p1.add_argument("--reports", type=str, default=None,
                      help="쉼표로 구분된 보고서 ID만 실행 (예: 1 또는 1,3,5). 미지정 시 11개 전부")
-    p1.add_argument("--repeats", type=int, default=5)
+    p1.add_argument("--repeats", type=int, default=5,
+                     help="report+llm 조합마다 이 번호까지 repeat를 채운다 (기본 5). 이미 실행된 "
+                          "repeat는 자동으로 건너뛰므로, 같은 명령을 다시 실행하면 이어서 채워진다 "
+                          "(예: 1회차가 이미 있으면 --repeats 5는 2~5회차만 새로 실행)")
     p1.add_argument("--step", type=str, default="1~4",
                      help="main.py --step 값 (기본 1~4: 생성만, VM/Caldera 불필요). "
                           "5를 포함하면 --skip-correction이 자동으로 붙어 초기 실행 결과만 저장됨")

@@ -24,6 +24,15 @@ class LLMUsage:
     output_tokens: int
     total_tokens: int
     cost: float = 0.0
+    duration_seconds: float = 0.0  # API 호출 자체(요청~응답)에 걸린 시간
+    timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
+
+
+@dataclass
+class PhaseTiming:
+    """Step 안의 세부 단계 소요 시간 (예: Step3 stage1/stage2, Step5 업로드/실행/재시도별)"""
+    label: str
+    duration_seconds: float
     timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
 
 
@@ -35,10 +44,12 @@ class StepMetrics:
     end_time: Optional[str] = None
     duration_seconds: float = 0.0
     llm_calls: List[LLMUsage] = field(default_factory=list)
+    phase_timings: List[PhaseTiming] = field(default_factory=list)
     total_input_tokens: int = 0
     total_output_tokens: int = 0
     total_tokens: int = 0
     total_cost: float = 0.0
+    total_llm_call_seconds: float = 0.0  # 이 Step 안 LLM API 호출 시간 합계
     status: str = "running"  # running, completed, failed
     error_message: str = ""
 
@@ -56,6 +67,7 @@ class ExperimentMetrics:
     total_output_tokens: int = 0
     total_tokens: int = 0
     total_cost: float = 0.0
+    total_llm_call_seconds: float = 0.0  # 전체 LLM API 호출 시간 합계
     llm_provider: str = ""
     llm_model: str = ""
     status: str = "running"  # running, completed, failed
@@ -176,19 +188,20 @@ class MetricsTracker:
         self._current_step.status = "completed" if success else "failed"
         self._current_step.error_message = error_message
 
-        # Step의 총 토큰 및 비용 계산
+        # Step의 총 토큰/비용/LLM 호출 시간 계산
         for usage in self._current_step.llm_calls:
             self._current_step.total_input_tokens += usage.input_tokens
             self._current_step.total_output_tokens += usage.output_tokens
             self._current_step.total_tokens += usage.total_tokens
             self._current_step.total_cost += usage.cost
+            self._current_step.total_llm_call_seconds += usage.duration_seconds
 
         self.experiment.steps.append(self._current_step)
         self._current_step = None
         self._step_start_time = None
 
-    def record_llm_call(self, model: str, input_tokens: int, output_tokens: int):
-        """LLM API 호출 기록"""
+    def record_llm_call(self, model: str, input_tokens: int, output_tokens: int, duration_seconds: float = 0.0):
+        """LLM API 호출 기록 (duration_seconds: 요청~응답까지 걸린 시간)"""
         total_tokens = input_tokens + output_tokens
         cost = CostCalculator.calculate_cost(model, input_tokens, output_tokens)
 
@@ -197,17 +210,34 @@ class MetricsTracker:
             input_tokens=input_tokens,
             output_tokens=output_tokens,
             total_tokens=total_tokens,
-            cost=cost
+            cost=cost,
+            duration_seconds=duration_seconds
         )
 
         if self._current_step is not None:
             self._current_step.llm_calls.append(usage)
 
         # 전체 실험 메트릭 업데이트
+        self.experiment.total_llm_call_seconds += duration_seconds
         self.experiment.total_input_tokens += input_tokens
         self.experiment.total_output_tokens += output_tokens
         self.experiment.total_tokens += total_tokens
         self.experiment.total_cost += cost
+
+    def record_phase(self, label: str, duration_seconds: float):
+        """Step 안의 세부 단계 시간 기록 (예: 'upload', 'retry1_execution_wait', 'stage2_command_generation').
+        현재 진행 중인 Step이 없으면 조용히 무시된다(호출 시점에 Step이 열려있어야 기록됨)."""
+        if self._current_step is not None:
+            self._current_step.phase_timings.append(PhaseTiming(label=label, duration_seconds=duration_seconds))
+
+    @contextmanager
+    def track_phase(self, label: str):
+        """with tracker.track_phase("upload"): ... 형태로 구간 시간을 잴 때 사용."""
+        start = time.time()
+        try:
+            yield
+        finally:
+            self.record_phase(label, time.time() - start)
 
     def finalize(self, success: bool = True):
         """실험 종료 및 최종 메트릭 계산"""
@@ -233,6 +263,8 @@ class MetricsTracker:
             "pdf_name": self.experiment.pdf_name,
             "duration_seconds": self.experiment.total_duration_seconds,
             "duration_formatted": self._format_duration(self.experiment.total_duration_seconds),
+            "total_llm_call_seconds": self.experiment.total_llm_call_seconds,
+            "non_llm_call_seconds": max(0.0, self.experiment.total_duration_seconds - self.experiment.total_llm_call_seconds),
             "llm_provider": self.experiment.llm_provider,
             "llm_model": self.experiment.llm_model,
             "total_input_tokens": self.experiment.total_input_tokens,

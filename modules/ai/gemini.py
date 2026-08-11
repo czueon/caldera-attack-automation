@@ -1,4 +1,5 @@
 """Google Gemini 클라이언트 구현체."""
+import time
 from typing import Optional
 import google.generativeai as genai
 from modules.core.config import get_google_api_key, get_gemini_model
@@ -39,10 +40,12 @@ class GeminiClient(LLMClient):
         if system_prompt:
             full_prompt = f"{system_prompt}\n\n{prompt}"
 
+        start = time.time()
         response = self.model.generate_content(
             full_prompt,
             generation_config=generation_config
         )
+        duration = time.time() - start
 
         # 메트릭 추적
         tracker = get_metrics_tracker()
@@ -50,7 +53,8 @@ class GeminiClient(LLMClient):
             tracker.record_llm_call(
                 model=self.model_name,
                 input_tokens=response.usage_metadata.prompt_token_count,
-                output_tokens=response.usage_metadata.candidates_token_count
+                output_tokens=response.usage_metadata.candidates_token_count,
+                duration_seconds=duration
             )
 
         return response.text

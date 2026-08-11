@@ -1,4 +1,5 @@
 """OpenAI ChatGPT 클라이언트 구현체."""
+import time
 from typing import Optional
 import openai
 from modules.core.config import get_openai_api_key, get_openai_model
@@ -57,6 +58,7 @@ class ChatGPTClient(LLMClient):
             self.model.startswith('gpt-5')
         )
 
+        start = time.time()
         if use_completion_tokens:
             if is_reasoning_model:
                 # o1 모델: temperature 제외
@@ -80,6 +82,7 @@ class ChatGPTClient(LLMClient):
                 max_tokens=max_tokens,
                 temperature=0.7
             )
+        duration = time.time() - start
 
         # 메트릭 추적
         tracker = get_metrics_tracker()
@@ -87,7 +90,8 @@ class ChatGPTClient(LLMClient):
             tracker.record_llm_call(
                 model=self.model,
                 input_tokens=response.usage.prompt_tokens,
-                output_tokens=response.usage.completion_tokens
+                output_tokens=response.usage.completion_tokens,
+                duration_seconds=duration
             )
 
         return response.choices[0].message.content

@@ -1,4 +1,5 @@
 """xAI Grok 클라이언트 구현체."""
+import time
 from typing import Optional
 import openai
 from modules.core.config import get_grok_api_key, get_grok_model
@@ -39,6 +40,7 @@ class GrokClient(LLMClient):
 
         # Grok 모델도 OpenAI SDK를 사용하므로 최신 API 규격 적용
         # grok-beta, grok-2 등 최신 모델은 max_completion_tokens 사용 가능성 고려
+        start = time.time()
         try:
             response = self.client.chat.completions.create(
                 model=self.model,
@@ -57,6 +59,7 @@ class GrokClient(LLMClient):
                 )
             else:
                 raise
+        duration = time.time() - start
 
         # 메트릭 추적
         tracker = get_metrics_tracker()
@@ -64,7 +67,8 @@ class GrokClient(LLMClient):
             tracker.record_llm_call(
                 model=self.model,
                 input_tokens=response.usage.prompt_tokens,
-                output_tokens=response.usage.completion_tokens
+                output_tokens=response.usage.completion_tokens,
+                duration_seconds=duration
             )
 
         return response.choices[0].message.content

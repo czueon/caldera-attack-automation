@@ -157,10 +157,17 @@ class FailureClassifier:
 class AbilityFixer:
     """LLM 기반 Ability 수정"""
 
-    def __init__(self, classifier: FailureClassifier):
+    def __init__(self, classifier: FailureClassifier, include_failure_type: bool = True, include_history: bool = True):
+        """
+        Args:
+            include_failure_type: False면 프롬프트에 실패 유형 분류를 제공하지 않는다 (RQ2 ablation)
+            include_history: False면 프롬프트에 이전 수정 이력을 제공하지 않는다 (RQ2 ablation)
+        """
         self.llm = get_llm_client()
         self.prompt_manager = PromptManager()
         self.classifier = classifier
+        self.include_failure_type = include_failure_type
+        self.include_history = include_history
 
     def fix_ability(
         self,
@@ -201,14 +208,24 @@ class AbilityFixer:
         """LLM 프롬프트 구성"""
 
         original_cmd = original_ability.get('executors', [{}])[0].get('command', '')
-        failure_type_description = self.classifier.get_description(failed.failure_type)
 
         stderr_preview = failed.stderr[:1000] if failed.stderr else "(none)"
         stdout_preview = failed.stdout[:1000] if failed.stdout else "(none)"
 
-        # correction_history 포맷팅
+        # 실패 유형 분류 섹션 (RQ2 ablation: include_failure_type=False면 통째로 비움)
+        failure_classification_section = ""
+        if self.include_failure_type:
+            failure_type_description = self.classifier.get_description(failed.failure_type)
+            failure_classification_section = (
+                "═══════════════════════════════════════════════════════════════════\n"
+                f"[Failure Classification]: {failed.failure_type.value}\n"
+                "═══════════════════════════════════════════════════════════════════\n"
+                f"{failure_type_description}\n"
+            )
+
+        # correction_history 포맷팅 (RQ2 ablation: include_history=False면 통째로 비움)
         history_text = ""
-        if correction_history:
+        if self.include_history and correction_history:
             history_text = "\n[Previous Correction Attempts]\n"
             for h in correction_history:
                 history_text += f"- Attempt {h.get('attempt', 'N/A')}: {h.get('failure_type', 'Unknown')}\n"
@@ -226,8 +243,7 @@ class AbilityFixer:
             exit_code=failed.exit_code,
             stderr=stderr_preview,
             stdout=stdout_preview,
-            failure_type=failed.failure_type.value,
-            failure_type_description=failure_type_description,
+            failure_classification_section=failure_classification_section,
             env_description=env_description,
             correction_history=history_text
         )
@@ -284,9 +300,14 @@ class AbilityFixer:
 class OfflineCorrector:
     """오프라인 Self-Correcting 엔진"""
 
-    def __init__(self):
+    def __init__(self, include_failure_type: bool = True, include_history: bool = True):
+        """
+        Args:
+            include_failure_type: False면 수정 프롬프트에 실패 유형 분류를 제공하지 않는다 (RQ2 ablation)
+            include_history: False면 수정 프롬프트에 이전 수정 이력을 제공하지 않는다 (RQ2 ablation)
+        """
         self.classifier = FailureClassifier()
-        self.fixer = AbilityFixer(self.classifier)
+        self.fixer = AbilityFixer(self.classifier, include_failure_type=include_failure_type, include_history=include_history)
 
     def run(
         self,
@@ -661,6 +682,18 @@ def main():
         help="출력 디렉토리 (기본: abilities.yml과 같은 위치)"
     )
 
+    parser.add_argument(
+        "--no-failure-type",
+        action="store_true",
+        help="수정 프롬프트에서 실패 유형 분류를 제외 (RQ2 ablation)"
+    )
+
+    parser.add_argument(
+        "--no-history",
+        action="store_true",
+        help="수정 프롬프트에서 이전 수정 이력을 제외 (RQ2 ablation)"
+    )
+
     args = parser.parse_args()
 
     # Report 파일 확인
@@ -701,7 +734,10 @@ def main():
 
     # 실행
     try:
-        corrector = OfflineCorrector()
+        corrector = OfflineCorrector(
+            include_failure_type=not args.no_failure_type,
+            include_history=not args.no_history
+        )
         corrector.run(
             abilities_file=abilities_file,
             operation_report_file=args.report,

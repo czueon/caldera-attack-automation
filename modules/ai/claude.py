@@ -1,4 +1,5 @@
 """Anthropic Claude 클라이언트 구현체."""
+import time
 from typing import Optional
 import anthropic
 from modules.core.config import get_anthropic_api_key, get_claude_model
@@ -38,7 +39,9 @@ class ClaudeClient(LLMClient):
         if system_prompt:
             kwargs["system"] = system_prompt
 
+        start = time.time()
         response = self.client.messages.create(**kwargs)
+        duration = time.time() - start
 
         # 메트릭 추적
         tracker = get_metrics_tracker()
@@ -46,7 +49,8 @@ class ClaudeClient(LLMClient):
             tracker.record_llm_call(
                 model=self.model,
                 input_tokens=response.usage.input_tokens,
-                output_tokens=response.usage.output_tokens
+                output_tokens=response.usage.output_tokens,
+                duration_seconds=duration
             )
 
         return response.content[0].text

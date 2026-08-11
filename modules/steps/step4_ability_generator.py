@@ -1,10 +1,8 @@
 """
-Step 4: Caldera Ability Generator (전처리 + 최소 AI)
+Step 4: Caldera Ability Generator
 
-전략:
-1. AI는 command 생성만 담당 (토큰 비용 최소화)
-2. executor 구조, singleton 등은 전처리로 처리
-3. 최종 Caldera API 형식으로 변환
+Step 3에서 이미 생성된 node.environment_specific.commands를 그대로 사용해
+executor/singleton 등을 전처리로 채우고 Caldera API 형식으로 변환한다. AI 호출 없음.
 """
 
 import os
@@ -14,15 +12,10 @@ import re
 from typing import Dict, List, Optional
 import sys
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
-from modules.ai.factory import get_llm_client
-from modules.prompts.manager import PromptManager
 
 
 class AbilityGenerator:
     def __init__(self):
-        self.llm = get_llm_client()
-        self.prompt_manager = PromptManager()
-
         # UUID namespace for deterministic UUID generation
         self.uuid_namespace = uuid.UUID('12345678-1234-5678-1234-567812345678')
 
@@ -46,7 +39,7 @@ class AbilityGenerator:
         self.failed_nodes = []
 
     def generate_abilities(self, input_file: str, output_dir: str):
-        """Caldera Ability 생성 (전처리 + 최소 AI)"""
+        """Caldera Ability 생성 (전처리만, AI 호출 없음)"""
         print("\n[Step 4] Caldera Ability 생성 시작...")
 
         # Load concrete flow data from Step 3
@@ -175,71 +168,6 @@ class AbilityGenerator:
         }
 
         return ability
-
-    def _validate_and_improve_command(self, node: Dict, existing_command: str) -> Optional[str]:
-        """기존 command를 AI로 검증/개선 (Caldera 최적화)"""
-        node_name = node['name']
-
-        prompt = self.prompt_manager.render(
-            "step4_validate_command.yaml",
-            node_name=node_name,
-            existing_command=existing_command,
-        )
-
-        try:
-            response_text = self.llm.generate_text(prompt=prompt, max_tokens=500)
-
-            command_text = response_text.strip()
-            command_text = command_text.replace('```powershell', '').replace('```cmd', '').replace('```', '').strip()
-
-            # 여전히 거부하면 원본 사용
-            if "can't help" in command_text.lower() or "unauthorized" in command_text.lower():
-                print(f"    [WARNING] AI refused, using original command")
-                return existing_command
-
-            return command_text
-
-        except Exception as e:
-            print(f"    [WARNING] Validation failed: {e}, using original")
-            return existing_command
-
-    def _generate_command_only(self, node: Dict) -> Optional[str]:
-        """AI로 command만 생성 (최소 비용)"""
-        node_name = node['name']
-        description = node.get('description', '')
-        environment_specific = node.get('environment_specific', {})
-
-        # environment_specific을 간단한 텍스트로 변환
-        env_text = yaml.dump(environment_specific, allow_unicode=True, sort_keys=False) if environment_specific else "No specific environment details"
-
-        # Get tactic and technique info
-        tactic = node.get('tactic', 'execution')
-        technique = node.get('technique', {})
-        technique_id = technique.get('id', 'T0000')
-        technique_name = technique.get('name', 'Unknown')
-
-        prompt = self.prompt_manager.render(
-            "step4_generate_command.yaml",
-            node_name=node_name,
-            description=description,
-            tactic=tactic,
-            technique_id=technique_id,
-            technique_name=technique_name,
-            env_text=env_text,
-        )
-
-        try:
-            response_text = self.llm.generate_text(prompt=prompt, max_tokens=500)
-
-            command_text = response_text.strip()
-            # 코드 블록 제거
-            command_text = command_text.replace('```powershell', '').replace('```cmd', '').replace('```', '').strip()
-
-            return command_text
-
-        except Exception as e:
-            print(f"  [WARNING] AI 생성 실패: {e}")
-            return None
 
     def _extract_uploads_from_type(self, node_type: str, environment_specific: Dict) -> List[str]:
         """노드 타입이 exfiltration이면 upload 경로 추출"""

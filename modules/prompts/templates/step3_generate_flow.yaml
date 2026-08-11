@@ -18,25 +18,17 @@ prompt: |
 
   ## Core Principles (concise, mandatory)
 
-  1) Every node MUST include `environment_specific.commands`
-     - Single-line command executable in the target environment's shell
-     - Chain multiple actions in one line with `;`
-     - No code blocks/backticks/comments; plain command string only
-     - If a real command is impossible, add a simulation stub (e.g., echo); never leave it empty
-     - Follow any shell-specific constraints noted in the environment description
+  Note: commands are NOT generated here — a later stage generates one command per node.
+  This stage only selects the technique and captures the environment details that stage will need.
 
-  2) Enforce environment detail usage
-     - Reflect IP/URL/credentials/params/filenames/methods from the environment in the command when applicable
+  1) Enforce environment detail usage
+     - Reflect IP/URL/credentials/params/filenames/methods from the environment in `environment_specific` when applicable
      - No external downloads/URLs unless explicitly provided
 
-  3) Tool priority
-     - Priority 1: built-in OS/shell tools
-     - Priority 2: simulation command if a real command is impossible
-
-  4) Preserve information
+  2) Preserve information
      - Do not drop or simplify environment-specified values (e.g., POST parameter names, credentials, exact URLs)
 
-  5) **MITRE ATT&CK Technique Selection**
+  3) **MITRE ATT&CK Technique Selection**
      - For each node, select ONE appropriate MITRE ATT&CK technique
      - Use valid technique IDs from the Enterprise ATT&CK matrix (e.g., T1059.001, T1190, T1021.002)
      - Prefer sub-techniques (e.g., T1059.001) over parent techniques (e.g., T1059) when applicable
@@ -44,12 +36,6 @@ prompt: |
      - Use your knowledge of MITRE ATT&CK framework to select the most accurate technique
 
   ## Output Structure
-
-  **IMPORTANT YAML Formatting Rules**:
-  - Use YAML literal block scalar (|) for ALL commands fields to avoid escaping issues
-  - Format: `commands: |` followed by indented command on next line
-  - Do NOT use double quotes for commands
-  - Backslashes and special characters will be preserved correctly
 
   ```yaml
   nodes:
@@ -69,9 +55,7 @@ prompt: |
         credentials:
           username: "actual username"
           password: "actual password"
-        commands: |
-          Single-line command for target shell (use | literal block scalar)
-        # Include ANY other details from environment description
+        # Include ANY other details from environment description (no `commands` field here)
 
   edges:
     - from: "node_id"

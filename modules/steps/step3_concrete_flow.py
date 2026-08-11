@@ -10,6 +10,7 @@ import yaml
 import os
 import json
 import re
+import time
 from typing import Dict, List, Set
 import sys
 from pathlib import Path
@@ -22,12 +23,21 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from modules.ai.factory import get_llm_client
 from modules.prompts.manager import PromptManager
+from modules.core.knowledge_base import KnowledgeBase
+from modules.core.metrics import get_metrics_tracker
 
 
 class ConcreteFlowGenerator:
-    def __init__(self):
+    def __init__(self, use_knowledge_base: bool = True):
+        """
+        Args:
+            use_knowledge_base: False면 stage2에서 KB 예시 조회를 건너뛰고 LLM 자체 지식으로만
+                명령어를 생성한다 (RQ1 ablation "without knowledge base" 조건용).
+        """
         self.llm = get_llm_client()
         self.prompt_manager = PromptManager()
+        self.use_knowledge_base = use_knowledge_base
+        self.kb = KnowledgeBase() if use_knowledge_base else None
         self.mitre_techniques: Dict[str, Dict] = {}  # OS별 캐시 (검증용)
         self.valid_technique_ids: Dict[str, Set[str]] = {}  # OS별 유효 ID (검증용)
 
@@ -84,21 +94,14 @@ class ConcreteFlowGenerator:
             print(f"  [WARNING] MITRE v15.1 data not found at {mitre_path}")
             self.mitre_techniques[os_type] = {}
 
-    def generate_concrete_flow(self, abstract_flow_file: str,
-                              environment_md_file: str,
-                              output_file: str = None,
-                              version_id: str = None):
-        """Generate concrete attack flow by combining abstract flow + environment MD"""
-        print("\n[Step 3] Concrete Attack Flow Generation started (NO MITRE INJECTION)...")
-
-        # Load abstract flow
+    def _load_abstract_flow_and_meta(self, abstract_flow_file: str, version_id: str = None):
+        """step2 산출물에서 abstract_flow, pdf_name, version_id를 뽑아낸다."""
         with open(abstract_flow_file, 'r', encoding='utf-8') as f:
             abstract_data = yaml.safe_load(f)
 
         abstract_flow = abstract_data.get('abstract_flow', {})
         metadata = abstract_data.get('metadata', {})
 
-        # pdf_name, version_id 추출
         pdf_name = metadata.get('pdf_name')
         if not pdf_name:
             pdf_name = Path(abstract_flow_file).stem.replace("_step2", "")
@@ -112,26 +115,12 @@ class ConcreteFlowGenerator:
         )
         version_id = derived_version or datetime.now().strftime("%Y%m%d_%H%M%S")
 
-        # Read environment description (Markdown)
-        with open(environment_md_file, 'r', encoding='utf-8') as f:
-            environment_description = f.read()
+        return abstract_flow, pdf_name, version_id
 
-        print(f"  Abstract goals: {len(abstract_flow.get('attack_goals', []))}")
-        print(f"  Environment description: {len(environment_description)} characters")
-
-        # Extract OS from environment
-        os_type = self._extract_os_from_environment(environment_description)
-
-        # Load MITRE data for validation only
-        self._load_mitre_for_validation(os_type)
-
-        # Generate concrete flow (AI uses internal knowledge for techniques)
-        concrete_flow = self._generate_flow(abstract_flow, environment_description, os_type)
-
-        # Validate AI-generated technique IDs
-        concrete_flow = self._validate_technique_ids(concrete_flow, os_type)
-
-        # Save results
+    def _save_step3_output(self, output_file: str, pdf_name: str, version_id: str, os_type: str,
+                            concrete_flow: Dict, abstract_flow_file: str, environment_md_file: str,
+                            stage: str):
+        """stage: 'stage1_only'(기법 선택만) 또는 'complete'(명령어까지 생성 완료)."""
         output_data = {
             'metadata': {
                 'sources': {
@@ -141,6 +130,7 @@ class ConcreteFlowGenerator:
                 'pdf_name': pdf_name,
                 'version_id': version_id,
                 'step': 3,
+                'stage': stage,
                 'description': 'Concrete attack flow - AI internal knowledge (NO MITRE injection)',
                 'os_type': os_type,
                 'experiment': 'without_mitre_injection'
@@ -154,6 +144,94 @@ class ConcreteFlowGenerator:
         os.makedirs(os.path.dirname(output_file), exist_ok=True)
         with open(output_file, 'w', encoding='utf-8') as f:
             yaml.dump(output_data, f, allow_unicode=True, sort_keys=False)
+
+        return output_file
+
+    def generate_stage1_only(self, abstract_flow_file: str,
+                              environment_md_file: str,
+                              output_file: str = None,
+                              version_id: str = None):
+        """Stage1(기법/tactic/environment_specific 선택)까지만 실행하고 저장. commands는 생성하지 않음.
+        with_kb/without_kb처럼 Stage2 조건만 다르고 Stage1 결과는 동일해야 하는 경우, 이 결과를
+        재사용하면 Stage1을 중복 생성하지 않고 Stage2(generate_concrete_flow의 stage1_file 인자)로
+        바로 넘어갈 수 있다."""
+        print("\n[Step 3] Stage1 only (technique selection, no commands)...")
+
+        abstract_flow, pdf_name, version_id = self._load_abstract_flow_and_meta(abstract_flow_file, version_id)
+
+        with open(environment_md_file, 'r', encoding='utf-8') as f:
+            environment_description = f.read()
+
+        print(f"  Abstract goals: {len(abstract_flow.get('attack_goals', []))}")
+        os_type = self._extract_os_from_environment(environment_description)
+        self._load_mitre_for_validation(os_type)
+
+        concrete_flow = self._generate_flow(abstract_flow, environment_description, os_type)
+        concrete_flow = self._validate_technique_ids(concrete_flow, os_type)
+
+        output_file = self._save_step3_output(
+            output_file, pdf_name, version_id, os_type, concrete_flow,
+            abstract_flow_file, environment_md_file, stage='stage1_only'
+        )
+
+        print(f"[SUCCESS] Stage1 완료 -> {output_file}")
+        print(f"  - PDF: {pdf_name}")
+        print(f"  - Version: {version_id}")
+
+    def generate_concrete_flow(self, abstract_flow_file: str,
+                              environment_md_file: str,
+                              output_file: str = None,
+                              version_id: str = None,
+                              stage1_file: str = None):
+        """Generate concrete attack flow by combining abstract flow + environment MD.
+
+        stage1_file이 주어지면 stage1(기법 선택)을 새로 생성하지 않고 그 파일(generate_stage1_only의
+        산출물)에서 concrete_flow를 읽어와 stage2(명령어 생성)부터 시작한다.
+        """
+        print("\n[Step 3] Concrete Attack Flow Generation started (NO MITRE INJECTION)...")
+
+        abstract_flow, pdf_name, version_id = self._load_abstract_flow_and_meta(abstract_flow_file, version_id)
+
+        # Read environment description (Markdown)
+        with open(environment_md_file, 'r', encoding='utf-8') as f:
+            environment_description = f.read()
+
+        print(f"  Abstract goals: {len(abstract_flow.get('attack_goals', []))}")
+        print(f"  Environment description: {len(environment_description)} characters")
+
+        # Extract OS from environment
+        os_type = self._extract_os_from_environment(environment_description)
+
+        tracker = get_metrics_tracker()
+
+        if stage1_file:
+            print(f"  [Reusing stage1 result from {stage1_file}]")
+            with open(stage1_file, 'r', encoding='utf-8') as f:
+                stage1_data = yaml.safe_load(f)
+            concrete_flow = stage1_data['concrete_flow']
+        else:
+            # Load MITRE data for validation only
+            self._load_mitre_for_validation(os_type)
+
+            # Stage 1: generate flow with technique selection (no commands yet)
+            stage1_start = time.time()
+            concrete_flow = self._generate_flow(abstract_flow, environment_description, os_type)
+            if tracker:
+                tracker.record_phase("step3_stage1_technique_selection", time.time() - stage1_start)
+
+            # Validate AI-generated technique IDs
+            concrete_flow = self._validate_technique_ids(concrete_flow, os_type)
+
+        # Stage 2: generate one command per node (KB examples + predecessor outputs)
+        stage2_start = time.time()
+        concrete_flow = self._generate_commands(concrete_flow, environment_description, os_type)
+        if tracker:
+            tracker.record_phase("step3_stage2_command_generation", time.time() - stage2_start)
+
+        output_file = self._save_step3_output(
+            output_file, pdf_name, version_id, os_type, concrete_flow,
+            abstract_flow_file, environment_md_file, stage='complete'
+        )
 
         print(f"[SUCCESS] Concrete flow generation completed -> {output_file}")
         print(f"  - PDF: {pdf_name}")
@@ -263,6 +341,156 @@ class ConcreteFlowGenerator:
 
         print(f"  [OK] Technique validation: {valid_count} valid ({valid_rate:.1f}%), {invalid_count} unverified, {missing_count} missing")
         return flow
+
+    def _generate_commands(self, flow: Dict, environment_description: str, os_type: str) -> Dict:
+        """Stage 2: generate one command per node, in execution order, using KB examples
+        and preceding nodes' already-generated commands."""
+        print("  [Generating commands per node (Stage 2)...]")
+
+        nodes = flow.get('nodes', [])
+        node_dict = {node['id']: node for node in nodes}
+        edges = flow.get('edges', [])
+        execution_order = flow.get('execution_order') or [n['id'] for n in nodes]
+        execution_order = self._resolve_execution_order(execution_order, edges, node_dict)
+
+        predecessors: Dict[str, List[str]] = {}
+        for edge in edges:
+            predecessors.setdefault(edge['to'], []).append(edge['from'])
+
+        generated: Dict[str, str] = {}
+
+        for node_id in execution_order:
+            node = node_dict.get(node_id)
+            if not node:
+                continue
+
+            command = self._generate_command_for_node(node, node_dict, predecessors, generated,
+                                                        environment_description, os_type)
+            generated[node_id] = command
+            node.setdefault('environment_specific', {})['commands'] = command
+
+        print(f"  [OK] Generated {len(generated)} commands")
+        return flow
+
+    def _resolve_execution_order(self, execution_order: List[str], edges: List[Dict],
+                                  node_dict: Dict[str, Dict]) -> List[str]:
+        """execution_order가 edges의 의존관계(from이 to보다 먼저 와야 함)를 위반하면
+        경고를 남기고 위상정렬로 재계산한다. predecessor_commands가 조용히 비는 것을 방지."""
+        position = {node_id: i for i, node_id in enumerate(execution_order)}
+
+        violations = []
+        for edge in edges:
+            src, dst = edge.get('from'), edge.get('to')
+            if src not in position or dst not in position:
+                continue
+            if position[src] >= position[dst]:
+                violations.append((src, dst))
+
+        if not violations:
+            return execution_order
+
+        print(f"  [WARNING] execution_order violates {len(violations)} edge(s) "
+              f"{violations[:5]}{'...' if len(violations) > 5 else ''}; recomputing via topological sort")
+        return self._topological_sort(execution_order, edges, node_dict)
+
+    @staticmethod
+    def _topological_sort(fallback_order: List[str], edges: List[Dict], node_dict: Dict[str, Dict]) -> List[str]:
+        """Kahn's algorithm. 동률/사이클 상황에서는 fallback_order 상의 상대 순서를 최대한 보존."""
+        in_degree = {node_id: 0 for node_id in node_dict}
+        adjacency: Dict[str, List[str]] = {node_id: [] for node_id in node_dict}
+
+        for edge in edges:
+            src, dst = edge.get('from'), edge.get('to')
+            if src in node_dict and dst in node_dict:
+                adjacency[src].append(dst)
+                in_degree[dst] += 1
+
+        order_rank = {node_id: i for i, node_id in enumerate(fallback_order)}
+
+        def rank(node_id):
+            return order_rank.get(node_id, len(fallback_order))
+
+        ready = sorted([n for n in node_dict if in_degree[n] == 0], key=rank)
+
+        result = []
+        visited = set()
+        while ready:
+            ready.sort(key=rank)
+            current = ready.pop(0)
+            visited.add(current)
+            result.append(current)
+            for nxt in adjacency[current]:
+                in_degree[nxt] -= 1
+                if in_degree[nxt] == 0:
+                    ready.append(nxt)
+
+        # 사이클 등으로 위상정렬에 포함되지 못한 노드는 원래 순서 그대로 뒤에 붙임 (누락 방지)
+        for node_id in fallback_order:
+            if node_id not in visited:
+                result.append(node_id)
+                visited.add(node_id)
+
+        return result
+
+    def _generate_command_for_node(self, node: Dict, node_dict: Dict[str, Dict], predecessors: Dict[str, List[str]],
+                                    generated: Dict[str, str], environment_description: str, os_type: str) -> str:
+        technique = node.get('technique', {}) or {}
+        technique_id = technique.get('id', 'T0000')
+        technique_name = technique.get('name', 'Unknown')
+        environment_specific = node.get('environment_specific', {}) or {}
+
+        pred_lines = []
+        for pred_id in predecessors.get(node['id'], []):
+            if pred_id in generated:
+                pred_node = node_dict.get(pred_id, {})
+                pred_lines.append(f"- [{pred_id}] {pred_node.get('name', '')}: {generated[pred_id]}")
+        predecessor_commands = "\n".join(pred_lines) if pred_lines else "None"
+
+        examples = []
+        if self.use_knowledge_base and technique_id and technique_id != 'T0000':
+            try:
+                examples = self.kb.get_example_commands(technique_id, technique_name)
+            except Exception as e:
+                print(f"    [WARNING] KB lookup failed for {technique_id}: {e}")
+        example_commands = self._format_examples(examples) if examples else "None available"
+
+        prompt = self.prompt_manager.render(
+            "step3_generate_command.yaml",
+            os_type=os_type.capitalize(),
+            node_name=node.get('name', ''),
+            description=node.get('description', ''),
+            tactic=node.get('tactic', 'execution'),
+            technique_id=technique_id,
+            technique_name=technique_name,
+            environment_specific=yaml.dump(environment_specific, allow_unicode=True, sort_keys=False) if environment_specific else "None",
+            environment_description=environment_description,
+            predecessor_commands=predecessor_commands,
+            example_commands=example_commands,
+        )
+
+        return self._call_llm_for_command(prompt, node.get('name', node['id']))
+
+    def _call_llm_for_command(self, prompt: str, node_label: str, max_retries: int = 2) -> str:
+        for attempt in range(1, max_retries + 1):
+            try:
+                response_text = self.llm.generate_text(prompt=prompt, max_tokens=500)
+                command = response_text.strip()
+                command = command.replace('```powershell', '').replace('```cmd', '').replace('```', '').strip()
+                if not command:
+                    raise ValueError("Empty command generated")
+                return command
+            except Exception as e:
+                print(f"    [WARNING] Command generation for '{node_label}' attempt {attempt}/{max_retries} failed: {e}")
+
+        print(f"    [ERROR] Command generation for '{node_label}' failed after {max_retries} attempts, using stub")
+        return "echo 'command generation failed'"
+
+    @staticmethod
+    def _format_examples(examples: List[Dict]) -> str:
+        lines = []
+        for i, ex in enumerate(examples, 1):
+            lines.append(f"{i}. [{ex.get('test_name', '')}] ({ex.get('executor_name', '')})\n   {ex.get('command_template', '').strip()}")
+        return "\n".join(lines)
 
     def _extract_yaml(self, text: str) -> str:
         """Extract YAML from response"""

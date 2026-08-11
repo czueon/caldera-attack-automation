@@ -136,6 +136,8 @@ cp .env.example .env
 # .env 파일을 편집하여 API 키 및 환경 설정 입력
 ```
 
+Step 3의 명령어 생성에는 [Atomic Red Team](https://github.com/redcanaryco/atomic-red-team) 기반 지식 베이스도 쓰입니다 — 설정 방법은 `data/knowledge_base/README.md` 참고 (또는 `--no-kb`로 건너뛰기 가능).
+
 ---
 
 ## 설정 (Configuration)
@@ -192,11 +194,13 @@ python main.py --step 1-4 --pdf data/raw/KISA_TTPs_1.pdf --env environment_ttps1
 python main.py --step 3-5 --pdf data/raw/KISA_TTPs_1.pdf --env environment_ttps1.md
 ```
 
-### 전체 시나리오 일괄 실행 (11개 모두)
+### 배치 / Ablation 실험
 
 ```bash
-python auto_run.py
+python data/experiments/scripts/run_experiments.py generate --llms claude,openai --repeats 5
 ```
+
+with_kb/without_kb × failure-recovery ablation 매트릭스를 11개 보고서 전체에 대해 실행합니다. 결과는 `data/experiments/runs/`에 저장됩니다. 전체 CLI는 모듈 docstring 참고.
 
 ### 실행 인자
 
@@ -207,6 +211,9 @@ python auto_run.py
 | `--env` | 환경 명세 `.md` 파일 경로 | 필수 |
 | `--version-id` | 출력 디렉토리 버전 ID | 자동 (타임스탬프) |
 | `--llm` | LLM 제공자 (`claude` / `openai` / `gemini` / `grok`) | `.env` 설정값 |
+| `--no-kb` | Step 3: 명령어 생성 시 지식 베이스 예시 조회 끄기 (RQ1 ablation: without knowledge base) | KB 사용 |
+| `--no-failure-type` | Step 5: 수정 프롬프트에서 실패 유형 분류 제외 (RQ2 ablation) | 포함 |
+| `--no-history` | Step 5: 수정 프롬프트에서 이전 수정 이력 제외 (RQ2 ablation) | 포함 |
 
 ---
 
@@ -252,7 +259,6 @@ KISA 발간 CTI 보고서 11개 (2020–2024), 랜섬웨어·APT·워터링홀·
 ```
 caldera-attack-automation/
 ├── main.py                       # 메인 CLI 진입점
-├── auto_run.py                   # 일괄 자동화 (11개 전체)
 ├── requirements.txt
 ├── .env.example                  # 환경 설정 템플릿
 ├── run_config_details.md         # 시나리오별 실행 가이드
@@ -269,28 +275,23 @@ caldera-attack-automation/
 │   ├── caldera/                  # Caldera REST API 연동
 │   ├── steps/                    # 파이프라인 단계 구현 (1–5)
 │   ├── prompts/                  # LLM 프롬프트 템플릿 (YAML)
-│   └── core/                     # 공통 유틸리티
+│   └── core/                     # 공통 유틸리티 (knowledge_base.py 포함 — Step 3 명령어 예시)
 │
 ├── data/
 │   ├── raw/                      # 입력 KISA PDF (11개)
 │   ├── mitre/                    # MITRE ATT&CK JSON
 │   ├── kisa_ttps_ground_truth/   # Ground Truth TTP 매핑
-│   └── processed/                # 실험 결과 (타임스탬프별)
+│   ├── knowledge_base/           # Atomic Red Team 클론 + 빌드된 인덱스 (README.md 참고)
+│   ├── processed/                # 파이프라인 출력 (타임스탬프별)
+│   └── experiments/              # Ablation 실험 도구
+│       └── scripts/              #   배치 실행기(run_experiments.py) + 결과 집계기
 │
 ├── config/
 │   └── classification_rules.yml  # 실패 유형 분류 규칙
 │
-├── scripts/                      # 유틸리티 스크립트
+├── scripts/                      # 유틸리티 스크립트 (build_knowledge_base.py 포함)
 └── docs/                         # GitHub Pages (Just the Docs)
 ```
-
----
-
-## 데모
-
-> 🎬 데모 영상 준비 중입니다.
-
----
 
 ---
 

@@ -134,6 +134,8 @@ cp .env.example .env
 # Edit .env with your API keys and environment configuration
 ```
 
+Step 3's command generation also uses an [Atomic Red Team](https://github.com/redcanaryco/atomic-red-team)-based knowledge base — see `data/knowledge_base/README.md` to set it up (or run with `--no-kb` to skip it).
+
 ---
 
 ## Configuration
@@ -190,11 +192,13 @@ python main.py --step 1-4 --pdf data/raw/KISA_TTPs_1.pdf --env environment_ttps1
 python main.py --step 3-5 --pdf data/raw/KISA_TTPs_1.pdf --env environment_ttps1.md
 ```
 
-### Batch Automation (All 11 Scenarios)
+### Batch / Ablation Experiments
 
 ```bash
-python auto_run.py
+python data/experiments/scripts/run_experiments.py generate --llms claude,openai --repeats 5
 ```
+
+Runs the with_kb/without_kb × failure-recovery ablation matrix across all 11 reports; results land under `data/experiments/runs/`. See the module docstring for the full CLI.
 
 ### CLI Arguments
 
@@ -205,6 +209,9 @@ python auto_run.py
 | `--env` | Path to environment specification `.md` file | required |
 | `--version-id` | Custom version ID for output directory | timestamp |
 | `--llm` | LLM provider (`claude` / `openai` / `gemini` / `grok`) | from `.env` |
+| `--no-kb` | Step 3: disable knowledge-base examples in command generation (RQ1 ablation: without knowledge base) | KB enabled |
+| `--no-failure-type` | Step 5: exclude failure-type classification from the fix prompt (RQ2 ablation) | included |
+| `--no-history` | Step 5: exclude prior correction history from the fix prompt (RQ2 ablation) | included |
 
 ---
 
@@ -276,7 +283,6 @@ Included in this repository.
 ```
 caldera-attack-automation/
 ├── main.py                       # Main CLI entry point
-├── auto_run.py                   # Batch automation (all 11 scenarios)
 ├── requirements.txt
 ├── .env.example                  # Environment config template
 ├── run_config_details.md         # Per-scenario execution guide
@@ -308,18 +314,23 @@ caldera-attack-automation/
 │   └── core/                     # Shared utilities
 │       ├── config.py
 │       ├── models.py
-│       └── metrics.py
+│       ├── metrics.py
+│       └── knowledge_base.py     # Atomic Red Team-based command examples (Step 3)
 │
 ├── data/
 │   ├── raw/                      # Input KISA PDFs (11 files)
 │   ├── mitre/                    # MITRE ATT&CK JSON (v15.1, v16, v18)
 │   ├── kisa_ttps_ground_truth/   # Ground truth TTP mappings
-│   └── processed/                # Experiment outputs (timestamped)
+│   ├── knowledge_base/           # Atomic Red Team clone + built index (see its README.md)
+│   ├── processed/                # Pipeline outputs (timestamped)
+│   └── experiments/              # Ablation experiment tooling
+│       └── scripts/              #   Batch runner (run_experiments.py) + result analyzer
 │
 ├── config/
 │   └── classification_rules.yml  # Failure type classification rules
 │
 ├── scripts/                      # Utility scripts
+│   ├── build_knowledge_base.py   # Build data/knowledge_base/index from Atomic Red Team
 │   ├── analyze_metrics.py
 │   ├── analyze_report.py
 │   ├── vm_reload.py
@@ -327,18 +338,6 @@ caldera-attack-automation/
 │
 └── docs/                         # GitHub Pages (Just the Docs)
 ```
-
----
-
-## Demo
-
-> 🎬 Demo video coming soon.
-
-<!-- Uncomment when available:
-[![Demo Video](docs/assets/images/demo-thumbnail.png)](https://youtu.be/your-video-id)
--->
-
----
 
 ---
 

@@ -7,11 +7,14 @@ run_experiments.py가 남기는 manifest jsonl(요약 지표)에 의존하지 �
 (abilities.yml, operation_report.json, correction_report.json, experiment_metrics.json)을
 직접 파싱해서 계산하므로 manifest가 없거나 낡았어도 항상 최신 원본 기준으로 재계산된다.
 
-정합성 검증(중요): Caldera가 돌려주는 operation_report.json의 'statistics.total_abilities'는
-동일 ability가 여러 agent에서 실행되면 그만큼 적게 잡히고(중복 병합), 반대로 어떤 ability가
-아예 링크 없이 누락되면 그 ability는 통계에 잡히지도 않는다. 그래서 이 스크립트는 Caldera의
-total_abilities를 그대로 믿지 않고, abilities.yml에 실제로 몇 개가 "생성"됐는지를 진짜 분모로
-삼아 성공률을 다시 계산하고, 두 값이 다르면 경고로 표시한다.
+정합성 검증(중요): 일부 시나리오는 권한 상승 등을 위해 ability 실행 중 새 agent를 띄우고 기존
+agent를 대체하도록 의도적으로 설계돼 있다. 그래서 같은 ability가 2개 agent에서 실행되는 "중복
+실행"은 정상적인 현상이며(성공 여부는 "하나라도 성공하면 성공" 규칙으로 정확히 집계됨), 이것만
+있는 경우는 이상치로 보지 않는다. 반면 실행 기록 자체가 아예 없는 ability(옛 agent가 교체되는
+시점에 결과가 유실된 경우 등)는 그 ability의 성패를 알 수 없다는 실질적인 공백이므로 계속
+표시한다. Caldera가 돌려주는 operation_report.json의 'statistics.total_abilities'는 이 유실을
+그대로 반영해 실제 생성 개수보다 적게 잡히므로, 이 스크립트는 그 값을 그대로 믿지 않고
+abilities.yml에 실제로 몇 개가 "생성"됐는지를 진짜 분모로 삼아 성공률을 다시 계산한다.
 
 Usage:
     python data/experiments/scripts/analyze_experiments.py                          # data/experiments/runs/ 전체 집계
@@ -118,19 +121,23 @@ def analyze_operation(abilities_path: Path, operation_report_path: Path) -> Opti
 
     caldera_stats = report.get("statistics", {})
 
+    # anomalies: 성공률 신뢰도에 실질적으로 영향을 주는 것만 (전부 "missing"에서 비롯됨).
+    # notes: 참고 정보일 뿐 문제는 아닌 것 (중복 실행 — 권한 상승 등에서 의도된 agent 교체의
+    # 자연스러운 결과이며, "하나라도 성공하면 성공" 규칙으로 이미 정확히 처리됨).
     anomalies = []
+    notes = []
     if generated_count != distinct_in_results:
         anomalies.append(
             f"ability 수 불일치: 생성 {generated_count}개 vs 실행결과에 등장한 고유 ability {distinct_in_results}개"
         )
     if duplicated_ids:
-        anomalies.append(f"중복 실행된 ability {len(duplicated_ids)}개 (2개 이상 agent/paw에서 실행됨)")
+        notes.append(f"중복 실행된 ability {len(duplicated_ids)}개 (2개 이상 agent에서 실행 — 정상, agent 교체로 인한 것)")
     if missing_ids:
-        anomalies.append(f"실행 기록 자체가 없는 ability {len(missing_ids)}개 (Caldera가 link를 안 만듦)")
+        anomalies.append(f"실행 기록 자체가 없는 ability {len(missing_ids)}개 (성패를 알 수 없어 실패로 집계)")
     if caldera_stats.get("total_abilities") != generated_count:
         anomalies.append(
             f"Caldera 자체 집계(total_abilities={caldera_stats.get('total_abilities')})가 "
-            f"생성 개수({generated_count})와 다름 -> 이 리포트의 success_rate는 신뢰 금지"
+            f"생성 개수({generated_count})와 다름"
         )
 
     # echo 시뮬레이션 비율 (abilities.yml 커맨드 기준)
@@ -152,6 +159,7 @@ def analyze_operation(abilities_path: Path, operation_report_path: Path) -> Opti
         "echo_simulation_count": echo_counts.get("echo_simulation", 0),
         "echo_simulation_rate": round(echo_counts.get("echo_simulation", 0) / generated_count * 100, 2) if generated_count else 0.0,
         "anomalies": anomalies,
+        "notes": notes,
     }
 
 
@@ -242,9 +250,12 @@ def analyze_run(run_dir: Path) -> List[Dict]:
             )
             rec_metrics = load_metrics_summary(rec_metrics_path)
 
-            # correction_report.json의 final_result와 교차 검증 (있으면)
+            # correction_report.json의 final_result와 교차 검증 (있으면).
+            # final_result는 self-correction이 아직 진행 중(다른 report를 지금 돌리는 중 등)이면
+            # 파일에 키는 있지만 값이 null일 수 있어 .get(key, {})가 기본값을 못 돌려준다 ->
+            # "or {}"로 한 번 더 감싼다.
             correction = _load_json(rec_dir / "correction_report.json")
-            final_result = (correction or {}).get("final_result", {})
+            final_result = (correction or {}).get("final_result") or {}
 
             rec_row = {
                 "llm": llm, "repeat": repeat, "pdf_stem": pdf_stem, "run_id": run_id,
@@ -279,6 +290,7 @@ def print_summary(rows: List[Dict], anomalies_only: bool):
     anomaly_rows = 0
     for r in rows:
         anomalies = r.get("anomalies", [])
+        notes = r.get("notes", [])
         if anomalies:
             anomaly_rows += 1
         if anomalies_only and not anomalies:
@@ -291,10 +303,10 @@ def print_summary(rows: List[Dict], anomalies_only: bool):
         rate_str = f"{rate:.1f}%" if isinstance(rate, (int, float)) else "-"
         echo_rate = r.get("echo_simulation_rate")
         echo_str = f"{echo_rate:.1f}%" if isinstance(echo_rate, (int, float)) else "-"
-        anomaly_str = " / ".join(anomalies) if anomalies else ""
+        remark_str = " / ".join(anomalies + [f"[참고] {n}" for n in notes])
 
         print(f"{r['llm']:<8}{r['repeat']:<7}{r['pdf_stem']:<16}{r['kb']:<12}{stage_label:<14}"
-              f"{gen!s:>5}{succ!s:>5}{rate_str:>8}{echo_str:>7}  {anomaly_str}")
+              f"{gen!s:>5}{succ!s:>5}{rate_str:>8}{echo_str:>7}  {remark_str}")
 
     print("-" * 100)
     print(f"이상치 있는 row: {anomaly_rows}/{len(rows)}")
@@ -310,7 +322,7 @@ def write_csv(rows: List[Dict], csv_path: Path):
         "corrected_success", "corrected_failed", "corrected_success_rate",
         "echo_simulation_count", "echo_simulation_rate",
         "cost", "tokens", "duration_seconds", "llm_call_seconds",
-        "anomalies",
+        "anomalies", "notes",
     ]
     csv_path.parent.mkdir(parents=True, exist_ok=True)
     with open(csv_path, "w", newline="", encoding="utf-8-sig") as f:
@@ -319,6 +331,7 @@ def write_csv(rows: List[Dict], csv_path: Path):
         for r in rows:
             row = dict(r)
             row["anomalies"] = "; ".join(row.get("anomalies", []))
+            row["notes"] = "; ".join(row.get("notes", []))
             writer.writerow(row)
     print(f"\n[저장] CSV: {csv_path}")
 

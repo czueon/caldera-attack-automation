@@ -37,7 +37,7 @@ import time
 from dataclasses import dataclass, asdict
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Dict, List, Optional
 
 from tqdm import tqdm
 
@@ -125,7 +125,6 @@ REPORT_VBOX_CONFIG = {
     },
 }
 
-# 슬라이드 표기: 1:none, 2:type, 3:history, 4:type+history
 RQ2_CONDITIONS = {
     "none": {"no_failure_type": True, "no_history": True},
     "type": {"no_failure_type": False, "no_history": True},
@@ -363,16 +362,46 @@ def _run_dir(llm: str, repeat: int, pdf_stem: str, run_id: str) -> Path:
     return RUNS_DIR / llm / f"repeat_{repeat}" / pdf_stem / run_id
 
 
-def _done_repeats(llm: str, pdf_stem: str) -> int:
-    """이 llm+report 조합에서 이미 실행된 가장 큰 repeat 번호 (없으면 0)."""
-    done = 0
-    for repeat_dir in RUNS_DIR.glob(f"{llm}/repeat_*"):
-        if not (repeat_dir / pdf_stem).exists():
-            continue
-        try:
-            done = max(done, int(repeat_dir.name.removeprefix("repeat_")))
-        except ValueError:
-            pass
+def _load_generation_results() -> Dict[tuple, dict]:
+    """data/experiments/manifests/generation_manifest_*.jsonl 전체를 훑어서
+    (report_id, llm, use_kb, repeat) -> 성공(exit_code==0)한 가장 최근 row만 모은다.
+    generate를 여러 세션에 나눠 돌려도(중간에 끊기거나 나중에 이어 돌려도) 이 결과로
+    "실제로 성공한 조합"을 정확히 판정한다 (폴더 존재 여부만으로는 판정 못 함 —
+    예: 같은 repeat라도 with_kb만 성공하고 without_kb는 실패했을 수 있음)."""
+    results = {}
+    for path in sorted(MANIFESTS_DIR.glob("generation_manifest_*.jsonl")):
+        for line in path.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            row = json.loads(line)
+            if row.get("exit_code") != 0:
+                continue
+            key = (row["report_id"], row["llm"], row["use_kb"], row["repeat"])
+            results[key] = row  # 여러 세션에 걸쳐 중복되면 시간순으로 나중 것이 이김
+    return results
+
+
+def _missing_repeats(results: Dict[tuple, dict], report_id: int, llm: str, target: int) -> List[int]:
+    """1..target 중 with_kb/without_kb 둘 다 성공하지 못한 repeat 번호만 골라서 반환.
+    repeat_N은 서로 다른 독립 실행을 구분하는 라벨일 뿐 순서에 의미가 없으므로, 이미
+    성공한 번호(예: 2·3·5)는 그대로 두고 실패/미실행 번호(예: 1·4)만 다시 실행한다."""
+    return [n for n in range(1, target + 1)
+            if (report_id, llm, True, n) not in results or (report_id, llm, False, n) not in results]
+
+
+def _load_recovery_done() -> set:
+    """data/experiments/manifests/recovery_manifest_*.jsonl 전체에서 성공(exit_code==0)한
+    (report_id, llm, use_kb, repeat, condition) 조합 집합. recover 재개 시 이미 끝난
+    조합을 건너뛰기 위해 사용."""
+    done = set()
+    for path in sorted(MANIFESTS_DIR.glob("recovery_manifest_*.jsonl")):
+        for line in path.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            row = json.loads(line)
+            if row.get("exit_code") != 0:
+                continue
+            done.add((row["report_id"], row["llm"], row["use_kb"], row["repeat"], row["condition"]))
     return done
 
 
@@ -482,12 +511,13 @@ def cmd_generate(args):
         print(f"[WARNING] --step {args.step}에 3 이상이 없어 KB 조건별로 실행할 게 없습니다 "
               "(step1/2 생성만 하고 종료)")
 
-    repeat_ranges = {
-        (report["id"], llm): range(_done_repeats(llm, Path(report["pdf"]).stem) + 1, args.repeats + 1)
+    prior_results = _load_generation_results()
+    repeat_lists = {
+        (report["id"], llm): _missing_repeats(prior_results, report["id"], llm, args.repeats)
         for report in reports for llm in llms
     }
-    total_runs = sum(len(r) for r in repeat_ranges.values()) * 2
-    skipped = sum(1 for r in repeat_ranges.values() if len(r) == 0)
+    total_runs = sum(len(r) for r in repeat_lists.values()) * 2
+    skipped = sum(1 for r in repeat_lists.values() if len(r) == 0)
     if skipped:
         print(f"[INFO] {skipped}개 report+llm 조합은 이미 --repeats {args.repeats}만큼 실행되어 건너뜁니다")
     run_idx = 0
@@ -497,7 +527,7 @@ def cmd_generate(args):
             pdf_stem = Path(report["pdf"]).stem
             _apply_report_vbox_config(report["id"])
             for llm in llms:
-                for repeat in repeat_ranges[(report["id"], llm)]:
+                for repeat in repeat_lists[(report["id"], llm)]:
                     run_id = f"run_{datetime.now().strftime('%H%M%S')}"
                     run_label = f"report={report['id']} llm={llm} repeat={repeat}"
 
@@ -607,7 +637,6 @@ def cmd_recover(args):
 
     candidates = [r for r in gen_rows if r.get("exit_code") == 0 and (r.get("initial_failed") or 0) > 0]
 
-    # 특정 조합만 재실행하고 싶을 때(예: 동시 실행으로 결과가 오염된 케이스만 다시 돌리기)
     if getattr(args, "reports", None):
         wanted_ids = {int(x.strip()) for x in args.reports.split(",") if x.strip()}
         candidates = [r for r in candidates if r["report_id"] in wanted_ids]
@@ -620,6 +649,8 @@ def cmd_recover(args):
 
     print(f"[INFO] generate 결과 {len(gen_rows)}개 중 필터 적용 후 {len(candidates)}개 세트에 4가지 recovery 조건 적용")
 
+    recovery_done = _load_recovery_done()
+
     MANIFESTS_DIR.mkdir(parents=True, exist_ok=True)
     log_dir = EXPERIMENTS_DIR / "logs" / "recovery"
     out_manifest_path = MANIFESTS_DIR / f"recovery_manifest_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jsonl"
@@ -627,6 +658,7 @@ def cmd_recover(args):
     report_by_id = {r["id"]: r for r in REPORTS}
     total_runs = len(candidates) * len(RQ2_CONDITIONS)
     run_idx = 0
+    skipped = 0
 
     last_report_id = None
     with open(out_manifest_path, "w", encoding="utf-8") as manifest_f:
@@ -642,6 +674,12 @@ def cmd_recover(args):
 
             for condition, flags in RQ2_CONDITIONS.items():
                 run_idx += 1
+
+                done_key = (row["report_id"], row["llm"], row["use_kb"], row["repeat"], condition)
+                if done_key in recovery_done:
+                    skipped += 1
+                    continue
+
                 rec_dir = (_run_dir(row["llm"], row["repeat"], pdf_stem, row["run_id"])
                            / "recovery" / kb_label(row["use_kb"]) / condition)
                 dst_caldera_dir = rec_dir / "caldera"
@@ -715,8 +753,103 @@ def cmd_recover(args):
                 rr = f"{result.recovery_rate * 100:.1f}%" if result.recovery_rate is not None else "N/A"
                 print(f"  -> {status} in {duration:.0f}s, recovery_rate={rr}")
 
+    if skipped:
+        print(f"[INFO] 이미 성공했던 {skipped}건은 건너뛰었습니다")
     print(f"\n[DONE] recover 매트릭스 실행 완료. manifest: {out_manifest_path}")
     return out_manifest_path
+
+
+# ============================================================================
+# full: 보고서 하나씩 generate -> recover까지 순서대로 끝낸다.
+# (generate를 전체 보고서에 대해 다 끝내고 나서 recover를 한꺼번에 도는 방식은, 중간에
+#  끊기면 이미 끝낸 generate 결과에 대한 recover가 하나도 안 된 상태로 남는다. 그래서
+#  보고서 단위로 매듭지어서, 중간에 끊겨도 그 보고서만 다시 이어 하면 되게 한다.)
+# ============================================================================
+
+def cmd_full(args):
+    reports = REPORTS
+    if getattr(args, "reports", None):
+        wanted_ids = {int(x.strip()) for x in args.reports.split(",") if x.strip()}
+        reports = [r for r in REPORTS if r["id"] in wanted_ids]
+
+    for report in reports:
+        print(f"\n{'#' * 70}\n# report {report['id']}: generate\n{'#' * 70}")
+        cmd_generate(argparse.Namespace(
+            llms=args.llms, reports=str(report["id"]), repeats=args.repeats,
+            step=args.step, timeout=args.timeout,
+        ))
+
+        print(f"\n{'#' * 70}\n# report {report['id']}: recover\n{'#' * 70}")
+        rows = [row for key, row in _load_generation_results().items() if key[0] == report["id"]]
+        if not rows:
+            print(f"[WARNING] report {report['id']}: 성공한 generate 결과가 없어 recover를 건너뜁니다")
+            continue
+
+        # "generation_manifest_*" 패턴은 _load_generation_results()가 다시 훑는 대상이라,
+        # 여기서 만드는 recover 입력용 파일은 다른 접두사를 써서 안 섞이게 한다.
+        report_manifest = MANIFESTS_DIR / f"recover_input_report{report['id']}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jsonl"
+        with open(report_manifest, "w", encoding="utf-8") as f:
+            for row in rows:
+                f.write(json.dumps(row, ensure_ascii=False) + "\n")
+
+        cmd_recover(argparse.Namespace(
+            manifest=str(report_manifest), reports=str(report["id"]), llms=None, kb=None,
+            timeout=args.timeout,
+        ))
+
+    print("\n[DONE] 지정된 보고서 전체를 순서대로 generate+recover 완료")
+
+
+# ============================================================================
+# errors: 지금까지 쌓인 모든 manifest에서 실패(exit_code != 0)한 case를 모아 보여준다.
+# ============================================================================
+
+def cmd_errors(args):
+    pdf_by_report = {r["id"]: Path(r["pdf"]).stem for r in REPORTS}
+
+    def _find_logs(log_dir: Path, pdf_stem: str, run_id: str):
+        return sorted(log_dir.glob(f"{pdf_stem}__{run_id}__*.log"))
+
+    gen_failures = []
+    for path in sorted(MANIFESTS_DIR.glob("generation_manifest_*.jsonl")):
+        for line in path.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            row = json.loads(line)
+            if row.get("exit_code") != 0:
+                gen_failures.append(row)
+
+    rec_failures = []
+    for path in sorted(MANIFESTS_DIR.glob("recovery_manifest_*.jsonl")):
+        for line in path.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            row = json.loads(line)
+            if row.get("exit_code") != 0:
+                rec_failures.append(row)
+
+    print(f"[generate 실패] {len(gen_failures)}건")
+    log_dir = EXPERIMENTS_DIR / "logs" / "generation"
+    for row in gen_failures:
+        pdf_stem = pdf_by_report[row["report_id"]]
+        logs = _find_logs(log_dir, pdf_stem, row["run_id"])
+        print(f"  report={row['report_id']} llm={row['llm']} kb={row['use_kb']} repeat={row['repeat']} "
+              f"exit={row['exit_code']}")
+        for log in logs:
+            print(f"    log: {log}")
+
+    print(f"\n[recover 실패] {len(rec_failures)}건")
+    log_dir = EXPERIMENTS_DIR / "logs" / "recovery"
+    for row in rec_failures:
+        pdf_stem = pdf_by_report[row["report_id"]]
+        logs = _find_logs(log_dir, pdf_stem, row["run_id"])
+        print(f"  report={row['report_id']} llm={row['llm']} kb={row['use_kb']} repeat={row['repeat']} "
+              f"condition={row['condition']} exit={row['exit_code']}")
+        for log in logs:
+            print(f"    log: {log}")
+
+    if not gen_failures and not rec_failures:
+        print("[OK] 지금까지 실패한 case 없음")
 
 
 # ============================================================================
@@ -732,9 +865,9 @@ def main():
     p1.add_argument("--reports", type=str, default=None,
                      help="쉼표로 구분된 보고서 ID만 실행 (예: 1 또는 1,3,5). 미지정 시 11개 전부")
     p1.add_argument("--repeats", type=int, default=5,
-                     help="report+llm 조합마다 이 번호까지 repeat를 채운다 (기본 5). 이미 실행된 "
-                          "repeat는 자동으로 건너뛰므로, 같은 명령을 다시 실행하면 이어서 채워진다 "
-                          "(예: 1회차가 이미 있으면 --repeats 5는 2~5회차만 새로 실행)")
+                     help="report+llm 조합마다 1~N회차를 채운다 (기본 5). 이미 성공한 회차는 번호에 "
+                          "상관없이 건너뛰고 실패/미실행 회차만 다시 실행하므로, 같은 명령을 다시 "
+                          "실행하면 안전하게 이어서 채워진다")
     p1.add_argument("--step", type=str, default="1~4",
                      help="main.py --step 값 (기본 1~4: 생성만, VM/Caldera 불필요). "
                           "5를 포함하면 --skip-correction이 자동으로 붙어 초기 실행 결과만 저장됨")
@@ -748,6 +881,18 @@ def main():
     p2.add_argument("--kb", type=str, default=None, help="with_kb,without_kb 중 쉼표로 구분해서 지정 (예: with_kb)")
     p2.add_argument("--timeout", type=int, default=None)
     p2.set_defaults(func=cmd_recover)
+
+    p3 = sub.add_parser("full", help="보고서 하나씩 generate -> recover까지 끝내고 다음 보고서로 (VM/Caldera 필요)")
+    p3.add_argument("--llms", type=str, default="claude", help="쉼표로 구분된 LLM 목록 (예: claude,gemini)")
+    p3.add_argument("--reports", type=str, default=None,
+                     help="쉼표로 구분된 보고서 ID만 실행 (예: 1 또는 1,3,5). 미지정 시 11개 전부")
+    p3.add_argument("--repeats", type=int, default=5, help="report+llm 조합마다 1~N회차를 채운다 (실패/미실행 회차만 재실행)")
+    p3.add_argument("--step", type=str, default="all", help="main.py --step 값 (기본 all)")
+    p3.add_argument("--timeout", type=int, default=None, help="실행당 타임아웃(초)")
+    p3.set_defaults(func=cmd_full)
+
+    p4 = sub.add_parser("errors", help="지금까지 쌓인 manifest에서 실패(exit_code != 0)한 case + 로그 경로를 보여줌")
+    p4.set_defaults(func=cmd_errors)
 
     args = parser.parse_args()
     args.func(args)

@@ -175,8 +175,36 @@ def load_metrics_summary(metrics_path: Path) -> Dict:
     }
 
 
+def _run_completeness_score(run_dir: Path) -> tuple:
+    """run_dir 하나의 "완성도"를 비교 가능한 튜플로 매긴다.
+
+    같은 (llm, repeat, pdf) 아래 run_id가 여러 개 남아있는 경우(중간에 죽고 재실행한 경우 등)
+    generation/ 폴더가 있다는 것만으로는 완료된 시도인지 구분이 안 돼서, 실제로 몇 개나
+    채워져 있는지(kb 2종 generation + recovery kb*condition)를 세어 가장 완성도 높은 것 하나만
+    고른다. 동점이면 디렉토리 mtime이 더 최근인 쪽(=나중에 재실행된 쪽)을 우선한다.
+    """
+    gen_dir = run_dir / "generation"
+    gen_count = sum(1 for kb in KB_LABELS if (gen_dir / kb / "caldera" / "abilities.yml").exists())
+    rec_dir = run_dir / "recovery"
+    rec_count = 0
+    if rec_dir.exists():
+        for kb in KB_LABELS:
+            for cond_dir in (rec_dir / kb).glob("*"):
+                if (cond_dir / "caldera" / "correction_report.json").exists():
+                    rec_count += 1
+    try:
+        mtime = run_dir.stat().st_mtime
+    except OSError:
+        mtime = 0
+    return (gen_count, rec_count, mtime)
+
+
 def discover_run_dirs(runs_dir: Path, llm_filter: Optional[str], report_filter: Optional[str]) -> List[Path]:
-    """runs_dir 아래에서 {llm}/repeat_{n}/{pdf_stem}/{run_id}/ 디렉토리를 전부 찾는다."""
+    """runs_dir 아래에서 {llm}/repeat_{n}/{pdf_stem}/{run_id}/ 디렉토리를 찾는다.
+
+    같은 (llm, repeat, pdf) 조합에 run_id가 여러 개 있으면(크래시 후 재실행 등) 가장 완성도
+    높은 것 하나만 채택한다 — 안 그러면 미완료로 남은 run까지 같이 집계돼 row가 중복된다.
+    """
     run_dirs = []
     if not runs_dir.exists():
         return run_dirs
@@ -191,9 +219,14 @@ def discover_run_dirs(runs_dir: Path, llm_filter: Optional[str], report_filter: 
                     continue
                 if report_filter and report_filter not in pdf_dir.name:
                     continue
-                for run_dir in sorted(pdf_dir.iterdir()):
-                    if (run_dir / "generation").exists():
-                        run_dirs.append(run_dir)
+                candidates = [
+                    run_dir for run_dir in sorted(pdf_dir.iterdir())
+                    if (run_dir / "generation").exists()
+                ]
+                if not candidates:
+                    continue
+                best = max(candidates, key=_run_completeness_score)
+                run_dirs.append(best)
     return run_dirs
 
 

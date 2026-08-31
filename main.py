@@ -788,19 +788,26 @@ def main():
                         cumulative_correction_report['retry_attempts'].append(current_retry_data)
 
                         # 실패한 ability들을 correction_history에 추가
-                        failed_abilities_data = retry_report.get('failed_abilities', [])
+                        # retry_report(collect_full_outputs 반환값)에는 'failed_abilities' 키가 없어
+                        # (실제 키: operation_metadata/agents/results/statistics) 이 부분이 항상 빈 리스트를
+                        # 반환했다 -> correction_history가 절대 채워지지 않는 버그. 'results'에서 ability별
+                        # 실패 여부를 직접 재계산하는 동일 로직(_extract_failed_abilities)을 재사용해 수정한다.
+                        failed_abilities_data = corrector._extract_failed_abilities(retry_report)
                         for failed_ability in failed_abilities_data:
-                            ability_id = failed_ability.get('ability_id')
+                            ability_id = failed_ability.ability_id
                             if ability_id:
                                 # 이력에 추가
                                 if ability_id not in cumulative_correction_report['correction_history']:
                                     cumulative_correction_report['correction_history'][ability_id] = []
 
+                                failure_type = corrector.classifier.classify(
+                                    failed_ability.stderr, failed_ability.stdout, failed_ability.exit_code
+                                )
                                 cumulative_correction_report['correction_history'][ability_id].append({
                                     'attempt': retry_count + 1,
-                                    'command': failed_ability.get('command', 'N/A'),
-                                    'failure_type': failed_ability.get('status', 'Unknown'),
-                                    'error': failed_ability.get('stderr', '') or failed_ability.get('stdout', '')
+                                    'command': failed_ability.command or 'N/A',
+                                    'failure_type': failure_type.value,
+                                    'error': failed_ability.stderr or failed_ability.stdout or ''
                                 })
 
                         # 누적 correction_report.json 저장

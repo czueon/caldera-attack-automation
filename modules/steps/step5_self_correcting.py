@@ -525,8 +525,9 @@ class OfflineCorrector:
         # 2. 모든 Agent에서 실패한 ability만 추출
         failed_list = []
         for ability_id, runs in by_ability.items():
-            # 하나라도 성공(status == 0)이면 스킵
-            if any(r.get('status', 0) == 0 for r in runs):
+            # 하나라도 성공(status == 0)이면 스킵. status 키가 아예 없는 비정상 결과는
+            # 성공(0)으로 오판하면 위험하니 실패 취급되도록 존재하지 않는 값(-1)을 기본값으로 쓴다.
+            if any(r.get('status', -1) == 0 for r in runs):
                 continue
 
             # 모든 Agent에서 실패 → 첫 번째 실패 결과 사용
@@ -564,10 +565,10 @@ class OfflineCorrector:
                 "failed": stats.get('failed', 0)
             }
 
-        # statistics가 없으면 results에서 계산
+        # statistics가 없으면 results에서 계산 (status 키 없는 결과를 성공으로 오판하지 않도록 -1을 기본값으로)
         results = operation_report.get('results', [])
         total = len(results)
-        success = sum(1 for r in results if r.get('status', 0) == 0)
+        success = sum(1 for r in results if r.get('status', -1) == 0)
         failed = total - success
 
         return {"total": total, "success": success, "failed": failed}

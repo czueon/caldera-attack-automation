@@ -647,7 +647,13 @@ def cmd_recover(args):
         wanted_kb = {x.strip() for x in args.kb.split(",") if x.strip()}
         candidates = [r for r in candidates if kb_label(r["use_kb"]) in wanted_kb]
 
-    print(f"[INFO] generate 결과 {len(gen_rows)}개 중 필터 적용 후 {len(candidates)}개 세트에 4가지 recovery 조건 적용")
+    conditions = dict(RQ2_CONDITIONS)
+    if getattr(args, "conditions", None):
+        wanted_conditions = {x.strip() for x in args.conditions.split(",") if x.strip()}
+        conditions = {k: v for k, v in RQ2_CONDITIONS.items() if k in wanted_conditions}
+
+    print(f"[INFO] generate 결과 {len(gen_rows)}개 중 필터 적용 후 {len(candidates)}개 세트에 "
+          f"{len(conditions)}가지 recovery 조건({','.join(conditions)}) 적용")
 
     recovery_done = _load_recovery_done()
 
@@ -656,7 +662,7 @@ def cmd_recover(args):
     out_manifest_path = MANIFESTS_DIR / f"recovery_manifest_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jsonl"
 
     report_by_id = {r["id"]: r for r in REPORTS}
-    total_runs = len(candidates) * len(RQ2_CONDITIONS)
+    total_runs = len(candidates) * len(conditions)
     run_idx = 0
     skipped = 0
 
@@ -672,7 +678,7 @@ def cmd_recover(args):
                 _apply_report_vbox_config(row["report_id"])
                 last_report_id = row["report_id"]
 
-            for condition, flags in RQ2_CONDITIONS.items():
+            for condition, flags in conditions.items():
                 run_idx += 1
 
                 done_key = (row["report_id"], row["llm"], row["use_kb"], row["repeat"], condition)
@@ -879,6 +885,8 @@ def main():
     p2.add_argument("--reports", type=str, default=None, help="쉼표로 구분된 보고서 ID만 재실행 (예: 1)")
     p2.add_argument("--llms", type=str, default=None, help="쉼표로 구분된 LLM만 재실행 (예: openai)")
     p2.add_argument("--kb", type=str, default=None, help="with_kb,without_kb 중 쉼표로 구분해서 지정 (예: with_kb)")
+    p2.add_argument("--conditions", type=str, default=None,
+                     help="none,type,history,both 중 쉼표로 구분해서 지정 (미지정 시 4개 전부)")
     p2.add_argument("--timeout", type=int, default=None)
     p2.set_defaults(func=cmd_recover)
 
